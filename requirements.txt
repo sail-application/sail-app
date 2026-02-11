@@ -1,0 +1,17 @@
+# SAIL CRM Engine - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# HTTP requests
+requests>=2.31.0
+
+# Web scraping for lead enrichment
+beautifulsoup4>=4.12.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# CSV handling (stdlib, but listed for clarity)
+# csv - built-in
+
+# Linting and code quality (dev)
+ruff>=0.4.0
