@@ -219,3 +219,5 @@ The CRM automation engine (lead generation, prospect enrichment) lives in a sepa
 3. Check existing code in the repo before creating new files — avoid duplication
 4. Ask clarifying questions early rather than making assumptions
 5. When task is done, provide a clear summary of: what was built, how to run it, and what's left to do
+
+AI suggestion prompts must be methodology-aware. The active methodologies for a user are read from the methodologies table. Never hardcode Paul Cherry as the only framework.
