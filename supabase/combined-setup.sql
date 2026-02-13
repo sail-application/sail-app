@@ -1,161 +1,42 @@
 -- ============================================================================
--- SAIL — Sales AI Learning Platform
--- Combined Database Setup Script
--- ============================================================================
+-- SAIL v2 — Combined Database Setup
+-- Generated: 2026-02-13
+-- 
+-- This file combines all 16 migration files + seed data into one script.
+-- Run this in the Supabase SQL Editor to set up the entire database.
 --
--- This file combines all 16 Supabase migration files and the seed data into
--- a single SQL script that can be pasted directly into the Supabase SQL Editor.
---
--- It creates the complete SAIL database schema including:
---   - 14 tables with Row Level Security (RLS) policies
---   - 2 trigger functions (handle_new_user, set_updated_at)
---   - Indexes for query performance
---   - Seed data (authorized members, strategies, feature flags, AI config)
---
--- Migration files included (in order):
---   01. authorized_members   — Skool community email whitelist
---   02. user_roles            — RBAC role assignments
---   03. user_profiles         — Extended user profiles + signup trigger
---   04. app_settings          — Key-value configuration store
---   05. ai_provider_config    — Per-feature AI provider settings
---   06. token_usage_logs      — AI token consumption tracking
---   07. audit_logs            — Admin action audit trail
---   08. webhook_events        — External webhook event log
---   09. email_conversations   — AI email composition chat history
---   10. call_history          — Call recordings and analysis
---   11. user_notes            — User notes linked to calls
---   12. practice_sessions     — AI roleplay training sessions
---   13. strategies            — Paul Cherry methodology content
---   14. feature_flags         — Feature rollout toggles
---   15. background_jobs       — Async job queue
---   16. updated_at trigger    — Auto-update timestamps on all tables
---
--- Followed by: seed.sql — Initial data for dev/testing
---
--- Generated on: 2026-02-13
+-- IMPORTANT: If you previously ran a partial setup, first run the cleanup
+-- section at the top to drop any partially-created tables.
 -- ============================================================================
 
+-- ============================================================================
+-- CLEANUP (only needed if previous run partially failed)
+-- Uncomment the lines below if you need to start fresh.
+-- ============================================================================
+-- DROP TABLE IF EXISTS background_jobs CASCADE;
+-- DROP TABLE IF EXISTS feature_flags CASCADE;
+-- DROP TABLE IF EXISTS strategies CASCADE;
+-- DROP TABLE IF EXISTS practice_sessions CASCADE;
+-- DROP TABLE IF EXISTS user_notes CASCADE;
+-- DROP TABLE IF EXISTS call_history CASCADE;
+-- DROP TABLE IF EXISTS email_conversations CASCADE;
+-- DROP TABLE IF EXISTS webhook_events CASCADE;
+-- DROP TABLE IF EXISTS audit_logs CASCADE;
+-- DROP TABLE IF EXISTS token_usage_logs CASCADE;
+-- DROP TABLE IF EXISTS ai_provider_config CASCADE;
+-- DROP TABLE IF EXISTS app_settings CASCADE;
+-- DROP TABLE IF EXISTS user_profiles CASCADE;
+-- DROP TABLE IF EXISTS authorized_members CASCADE;
+-- DROP TABLE IF EXISTS user_roles CASCADE;
+-- DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
 
--- ############################################################################
--- MIGRATION 01: 20260213000001_create_authorized_members.sql
--- ############################################################################
+
 
 -- ============================================================================
--- Migration: 20260213000001_create_authorized_members
--- Purpose: Skool community email whitelist for SAIL access gating.
---
--- SAIL is gated to SA Picture Day's Skool community members only.
--- During the auth callback (Google OAuth → Supabase), the system checks
--- this table to verify the user's email is whitelisted and is_active = true.
--- If not found or inactive, signup/login is rejected.
---
--- Admin users manage this table via the admin panel.
--- The service role is used during auth callback checks (bypasses RLS).
+-- Migration 01 of 16
 -- ============================================================================
-
-CREATE TABLE IF NOT EXISTS authorized_members (
-  -- Unique identifier for each whitelist entry
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-  -- The email address that is authorized to access SAIL
-  -- Must be unique — one entry per email
-  email TEXT NOT NULL UNIQUE,
-
-  -- Optional: the member's Skool community username for reference
-  skool_username TEXT,
-
-  -- Whether this member is currently allowed access
-  -- Set to false to revoke access without deleting the record
-  is_active BOOLEAN DEFAULT true NOT NULL,
-
-  -- Which admin added this member (nullable for seed/import data)
-  added_by UUID REFERENCES auth.users(id),
-
-  -- Timestamps for record tracking
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Enable Row Level Security — required on every table
-ALTER TABLE authorized_members ENABLE ROW LEVEL SECURITY;
-
 -- ============================================================================
--- RLS Policies
--- ============================================================================
-
--- Policy: Admins can view all authorized members
--- Used in the admin panel to manage the whitelist
-CREATE POLICY "Admins can view authorized members"
-  ON authorized_members
-  FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.user_id = auth.uid()
-        AND user_roles.role = 'admin'
-    )
-  );
-
--- Policy: Admins can insert new authorized members
-CREATE POLICY "Admins can insert authorized members"
-  ON authorized_members
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.user_id = auth.uid()
-        AND user_roles.role = 'admin'
-    )
-  );
-
--- Policy: Admins can update authorized members (e.g., toggle is_active)
-CREATE POLICY "Admins can update authorized members"
-  ON authorized_members
-  FOR UPDATE
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.user_id = auth.uid()
-        AND user_roles.role = 'admin'
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.user_id = auth.uid()
-        AND user_roles.role = 'admin'
-    )
-  );
-
--- Policy: Admins can delete authorized members
-CREATE POLICY "Admins can delete authorized members"
-  ON authorized_members
-  FOR DELETE
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_roles.user_id = auth.uid()
-        AND user_roles.role = 'admin'
-    )
-  );
-
--- Note: The service role (used during auth callbacks) bypasses RLS entirely,
--- so no explicit policy is needed for the auth check flow.
-
--- Add a comment on the table for documentation
-COMMENT ON TABLE authorized_members IS 'Skool community email whitelist — controls who can access SAIL';
-
-
--- ############################################################################
--- MIGRATION 02: 20260213000002_create_user_roles.sql
--- ############################################################################
-
--- ============================================================================
--- Migration: 20260213000002_create_user_roles
+-- Migration: 20260213000001_create_user_roles
 -- Purpose: Role-Based Access Control (RBAC) for SAIL users.
 --
 -- Every authenticated user gets exactly one role:
@@ -266,10 +147,122 @@ CREATE POLICY "Admins can delete roles"
 COMMENT ON TABLE user_roles IS 'RBAC role assignments — one role per user (admin, team_lead, rep)';
 
 
--- ############################################################################
--- MIGRATION 03: 20260213000003_create_user_profiles.sql
--- ############################################################################
+-- ============================================================================
+-- Migration 02 of 16
+-- ============================================================================
+-- ============================================================================
+-- Migration: 20260213000002_create_authorized_members
+-- Purpose: Skool community email whitelist for SAIL access gating.
+--
+-- SAIL is gated to SA Picture Day's Skool community members only.
+-- During the auth callback (Google OAuth → Supabase), the system checks
+-- this table to verify the user's email is whitelisted and is_active = true.
+-- If not found or inactive, signup/login is rejected.
+--
+-- Admin users manage this table via the admin panel.
+-- The service role is used during auth callback checks (bypasses RLS).
+-- ============================================================================
 
+CREATE TABLE IF NOT EXISTS authorized_members (
+  -- Unique identifier for each whitelist entry
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- The email address that is authorized to access SAIL
+  -- Must be unique — one entry per email
+  email TEXT NOT NULL UNIQUE,
+
+  -- Optional: the member's Skool community username for reference
+  skool_username TEXT,
+
+  -- Whether this member is currently allowed access
+  -- Set to false to revoke access without deleting the record
+  is_active BOOLEAN DEFAULT true NOT NULL,
+
+  -- Which admin added this member (nullable for seed/import data)
+  added_by UUID REFERENCES auth.users(id),
+
+  -- Timestamps for record tracking
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Enable Row Level Security — required on every table
+ALTER TABLE authorized_members ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- RLS Policies
+-- ============================================================================
+
+-- Policy: Admins can view all authorized members
+-- Used in the admin panel to manage the whitelist
+CREATE POLICY "Admins can view authorized members"
+  ON authorized_members
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_roles
+      WHERE user_roles.user_id = auth.uid()
+        AND user_roles.role = 'admin'
+    )
+  );
+
+-- Policy: Admins can insert new authorized members
+CREATE POLICY "Admins can insert authorized members"
+  ON authorized_members
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM user_roles
+      WHERE user_roles.user_id = auth.uid()
+        AND user_roles.role = 'admin'
+    )
+  );
+
+-- Policy: Admins can update authorized members (e.g., toggle is_active)
+CREATE POLICY "Admins can update authorized members"
+  ON authorized_members
+  FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_roles
+      WHERE user_roles.user_id = auth.uid()
+        AND user_roles.role = 'admin'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM user_roles
+      WHERE user_roles.user_id = auth.uid()
+        AND user_roles.role = 'admin'
+    )
+  );
+
+-- Policy: Admins can delete authorized members
+CREATE POLICY "Admins can delete authorized members"
+  ON authorized_members
+  FOR DELETE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_roles
+      WHERE user_roles.user_id = auth.uid()
+        AND user_roles.role = 'admin'
+    )
+  );
+
+-- Note: The service role (used during auth callbacks) bypasses RLS entirely,
+-- so no explicit policy is needed for the auth check flow.
+
+-- Add a comment on the table for documentation
+COMMENT ON TABLE authorized_members IS 'Skool community email whitelist — controls who can access SAIL';
+
+
+-- ============================================================================
+-- Migration 03 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000003_create_user_profiles
 -- Purpose: Extended user profiles for SAIL users.
@@ -405,10 +398,9 @@ COMMENT ON TABLE user_profiles IS 'Extended user profiles — auto-created on si
 COMMENT ON FUNCTION public.handle_new_user() IS 'Trigger function: creates profile + default role when a new user signs up';
 
 
--- ############################################################################
--- MIGRATION 04: 20260213000004_create_app_settings.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 04 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000004_create_app_settings
 -- Purpose: Key-value configuration store for admin-managed app settings.
@@ -519,10 +511,9 @@ CREATE POLICY "Admins can delete settings"
 COMMENT ON TABLE app_settings IS 'Key-value config store — admin-managed application settings organized by category';
 
 
--- ############################################################################
--- MIGRATION 05: 20260213000005_create_ai_provider_config.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 05 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000005_create_ai_provider_config
 -- Purpose: Per-feature AI provider configuration for the provider-agnostic
@@ -656,10 +647,9 @@ ON CONFLICT (feature) DO NOTHING;
 COMMENT ON TABLE ai_provider_config IS 'Per-feature AI provider settings — controls which model handles each SAIL feature';
 
 
--- ############################################################################
--- MIGRATION 06: 20260213000006_create_token_usage_logs.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 06 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000006_create_token_usage_logs
 -- Purpose: Track AI token consumption per feature per user.
@@ -760,10 +750,9 @@ CREATE POLICY "Allow token usage inserts"
 COMMENT ON TABLE token_usage_logs IS 'AI token consumption logs — tracks usage per feature per user for cost monitoring';
 
 
--- ############################################################################
--- MIGRATION 07: 20260213000007_create_audit_logs.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 07 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000007_create_audit_logs
 -- Purpose: Admin action tracking and audit trail.
@@ -851,10 +840,9 @@ CREATE POLICY "Allow audit log inserts"
 COMMENT ON TABLE audit_logs IS 'Admin action audit trail — append-only log of significant actions for security';
 
 
--- ############################################################################
--- MIGRATION 08: 20260213000008_create_webhook_events.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 08 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000008_create_webhook_events
 -- Purpose: Log all incoming webhook events from external services.
@@ -958,10 +946,9 @@ CREATE POLICY "Admins can update webhook events"
 COMMENT ON TABLE webhook_events IS 'Incoming webhook event log — stores full payloads from Stripe, Skool, and Zoho';
 
 
--- ############################################################################
--- MIGRATION 09: 20260213000009_create_email_conversations.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 09 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000009_create_email_conversations
 -- Purpose: Email composition chat history for the AI Email Composition feature.
@@ -1043,10 +1030,9 @@ CREATE POLICY "Users can delete own email conversations"
 COMMENT ON TABLE email_conversations IS 'AI email composition chat history — stores drafting sessions and final email drafts';
 
 
--- ############################################################################
--- MIGRATION 10: 20260213000010_create_call_history.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 10 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000010_create_call_history
 -- Purpose: Call recordings and post-call analysis from the Call Analyzer feature.
@@ -1149,10 +1135,9 @@ CREATE POLICY "Users can delete own call history"
 COMMENT ON TABLE call_history IS 'Call recordings and post-call analysis — stores transcripts, scores, and AI suggestions';
 
 
--- ############################################################################
--- MIGRATION 11: 20260213000011_create_user_notes.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 11 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000011_create_user_notes
 -- Purpose: User notes that can be linked to specific calls.
@@ -1256,10 +1241,9 @@ CREATE POLICY "Users can delete own notes"
 COMMENT ON TABLE user_notes IS 'User notes — can be linked to calls, starred, and categorized by skill/source';
 
 
--- ############################################################################
--- MIGRATION 12: 20260213000012_create_practice_sessions.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 12 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000012_create_practice_sessions
 -- Purpose: Practice mode session tracking for AI roleplay training.
@@ -1359,10 +1343,9 @@ CREATE POLICY "Users can delete own practice sessions"
 COMMENT ON TABLE practice_sessions IS 'Practice mode sessions — AI roleplay training with scoring and commitment stage tracking';
 
 
--- ############################################################################
--- MIGRATION 13: 20260213000013_create_strategies.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 13 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000013_create_strategies
 -- Purpose: Paul Cherry methodology content for the Strategies Library.
@@ -1482,10 +1465,9 @@ CREATE POLICY "Admins can delete strategies"
 COMMENT ON TABLE strategies IS 'Paul Cherry methodology content — searchable sales techniques for the Strategies Library';
 
 
--- ############################################################################
--- MIGRATION 14: 20260213000014_create_feature_flags.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 14 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000014_create_feature_flags
 -- Purpose: Simple feature flag system for controlling feature rollout.
@@ -1604,10 +1586,9 @@ ON CONFLICT (key) DO NOTHING;
 COMMENT ON TABLE feature_flags IS 'Feature flag system — controls feature rollout without code deploys';
 
 
--- ############################################################################
--- MIGRATION 15: 20260213000015_create_background_jobs.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 15 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000015_create_background_jobs
 -- Purpose: Async job queue for background processing tasks.
@@ -1733,10 +1714,9 @@ CREATE POLICY "Admins can update background jobs"
 COMMENT ON TABLE background_jobs IS 'Async job queue — tracks background tasks with retry logic and scheduling';
 
 
--- ############################################################################
--- MIGRATION 16: 20260213000016_create_updated_at_trigger.sql
--- ############################################################################
-
+-- ============================================================================
+-- Migration 16 of 16
+-- ============================================================================
 -- ============================================================================
 -- Migration: 20260213000016_create_updated_at_trigger
 -- Purpose: Reusable trigger function for auto-updating updated_at columns.
@@ -1840,10 +1820,9 @@ CREATE TRIGGER set_updated_at
   EXECUTE FUNCTION public.set_updated_at();
 
 
--- ############################################################################
--- SEED DATA: supabase/seed.sql
--- ############################################################################
-
+-- ============================================================================
+-- Seed Data
+-- ============================================================================
 -- ============================================================================
 -- Seed Data for SAIL — Sales AI Learning Platform
 -- Purpose: Populate the database with initial data for development and testing.
