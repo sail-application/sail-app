@@ -1,0 +1,66 @@
+# ============================================================================
+# Supabase CLI Configuration for SAIL — Sales AI Learning Platform
+#
+# This file configures the Supabase CLI for local development.
+# Actual project credentials are in environment variables (never committed).
+#
+# Usage:
+#   npx supabase start       — Start local Supabase stack
+#   npx supabase db reset    — Reset DB + apply migrations + seed
+#   npx supabase db push     — Push migrations to remote project
+#   npx supabase migration new <name> — Create a new migration file
+# ============================================================================
+
+[project]
+id = "your-project-ref-here"
+
+[api]
+# Port to use for the API URL
+port = 54321
+# Schemas to expose in the API. Set to "public" for standard usage.
+schemas = ["public", "graphql_public"]
+# Extra schemas to add to the search_path (beyond the defaults of public, extensions)
+extra_search_path = ["public", "extensions"]
+# Maximum number of rows to return from a single request (0 = unlimited)
+max_rows = 1000
+
+[db]
+# Port to use for the local database URL
+port = 54322
+# The major version of PostgreSQL to use
+major_version = 15
+
+[studio]
+# Port to use for Supabase Studio (local admin UI)
+port = 54323
+
+[inbucket]
+# Port to use for the email testing server (captures emails locally)
+port = 54324
+
+[storage]
+# Whether to enable the Storage service
+enabled = true
+
+[auth]
+# Whether to enable the Auth service
+enabled = true
+# The base URL of your SAIL application (for OAuth redirects)
+site_url = "http://localhost:3000"
+# Allowed redirect URLs after authentication
+additional_redirect_urls = ["http://localhost:3000"]
+# JWT expiry time in seconds (3600 = 1 hour)
+jwt_expiry = 3600
+# Whether new users can sign up (controlled by authorized_members table)
+enable_signup = true
+
+[auth.external.google]
+# Google OAuth is enabled — credentials come from environment variables
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+redirect_uri = "http://localhost:54321/auth/v1/callback"
+
+[analytics]
+# Whether to enable Supabase Analytics (logflare)
+enabled = false

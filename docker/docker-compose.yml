@@ -1,0 +1,40 @@
+# docker/docker-compose.yml
+#
+# Full local development stack: Next.js app + PostgreSQL database.
+#
+# Usage:
+#   docker compose -f docker/docker-compose.yml up -d    # Start
+#   docker compose -f docker/docker-compose.yml down      # Stop
+#   docker compose -f docker/docker-compose.yml logs -f   # Follow logs
+#
+# The app reads env vars from ../.env.local (project root).
+# The database uses the official Supabase Postgres image for parity
+# with production.
+
+services:
+  # Next.js application container
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../.env.local
+    depends_on:
+      - db
+
+  # PostgreSQL database (Supabase-compatible image)
+  db:
+    image: supabase/postgres:15.8.1.050
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sail
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+# Named volume for persistent database storage across container restarts
+volumes:
+  db_data:
