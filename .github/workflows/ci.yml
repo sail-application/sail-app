@@ -1,0 +1,42 @@
+# .github/workflows/ci.yml
+#
+# Continuous Integration pipeline for pull requests.
+# Runs on every PR targeting main or staging branches.
+#
+# Steps:
+#   1. Checkout code
+#   2. Set up Node.js 22 with npm cache
+#   3. Install dependencies (npm ci for reproducible installs)
+#   4. Run ESLint
+#   5. Run TypeScript type checking
+#   6. Run production build to catch build-time errors
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build

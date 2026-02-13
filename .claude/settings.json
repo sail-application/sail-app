@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'BRANCH=$(cd /home/user/sail-app && git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ \"$BRANCH\" = \"main\" ] || [ \"$BRANCH\" = \"master\" ]; then echo \"BLOCKED: Direct edits on $BRANCH are not allowed. Switch to a feature branch first.\"; exit 1; fi; exit 0'"
+          }
+        ]
+      }
+    ]
+  }
+}

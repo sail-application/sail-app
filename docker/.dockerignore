@@ -1,0 +1,11 @@
+# docker/.dockerignore
+#
+# Files and directories excluded from the Docker build context.
+# This speeds up builds and prevents sensitive files from being
+# copied into the image.
+
+node_modules
+.next
+.git
+.env*
+docker/data

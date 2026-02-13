@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+/*
+ * globals.css — Tailwind v4 theme with glassmorphism design tokens.
+ * Defines the SAIL visual language: glass panels, brand colors, blur effects.
+ * All custom properties are consumed by components via Tailwind classes.
+ */
+
+@theme inline {
+  /* Brand palette — blue-tinted professional look */
+  --color-brand-50: oklch(0.97 0.01 250);
+  --color-brand-100: oklch(0.93 0.03 250);
+  --color-brand-200: oklch(0.87 0.06 250);
+  --color-brand-300: oklch(0.78 0.09 250);
+  --color-brand-400: oklch(0.68 0.12 250);
+  --color-brand-500: oklch(0.55 0.15 250);
+  --color-brand-600: oklch(0.48 0.17 250);
+  --color-brand-700: oklch(0.40 0.15 250);
+  --color-brand-800: oklch(0.33 0.12 250);
+  --color-brand-900: oklch(0.25 0.10 250);
+
+  /* Semantic colors */
+  --color-success: oklch(0.72 0.19 145);
+  --color-warning: oklch(0.80 0.15 85);
+  --color-error: oklch(0.63 0.22 25);
+  --color-info: oklch(0.65 0.15 250);
+
+  /* Background and foreground */
+  --color-background: #ffffff;
+  --color-foreground: #0f172a;
+
+  /* Glass effect tokens */
+  --color-glass-bg: oklch(0.98 0.01 250 / 0.12);
+  --color-glass-border: oklch(1 0 0 / 0.18);
+  --color-glass-shadow: oklch(0 0 0 / 0.08);
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme inline {
+    --color-background: #0b1120;
+    --color-foreground: #e2e8f0;
+    --color-glass-bg: oklch(0.15 0.02 250 / 0.60);
+    --color-glass-border: oklch(1 0 0 / 0.10);
+    --color-glass-shadow: oklch(0 0 0 / 0.25);
+  }
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+/* Reusable glass effect — apply via @apply or use directly */
+.glass {
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-glass-border);
+  box-shadow: 0 8px 32px var(--color-glass-shadow);
+  border-radius: 16px;
+}
+
+.glass-heavy {
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--color-glass-border);
+  box-shadow: 0 12px 40px var(--color-glass-shadow);
+  border-radius: 20px;
+}
