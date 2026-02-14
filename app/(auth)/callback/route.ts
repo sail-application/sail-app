@@ -58,17 +58,14 @@ export async function GET(request: Request) {
     }
 
     /* Check if the user's email is in the authorized_members table.
-     * We lowercase the email to avoid case-sensitivity mismatches between
-     * Google OAuth (which may return mixed case) and the stored email.
-     * We also verify is_active = true so deactivated members can't log in. */
-    const { data: member } = await supabase
-      .from('authorized_members')
-      .select('id')
-      .eq('email', user.email.toLowerCase())
-      .eq('is_active', true)
-      .single();
+     * Uses a SECURITY DEFINER function to bypass RLS — this avoids the
+     * chicken-and-egg problem where the user needs to be authorized to
+     * read the authorization table. The function checks case-insensitively
+     * and verifies is_active = true. */
+    const { data: isMember } = await supabase
+      .rpc('check_membership', { user_email: user.email.toLowerCase() });
 
-    if (!member) {
+    if (!isMember) {
       /* User authenticated but not a Skool community member */
       return NextResponse.redirect(`${origin}/unauthorized`);
     }

@@ -37,17 +37,13 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  /* Step 2: Check Skool community membership via authorized_members table.
-   * Lowercase the email to avoid case-sensitivity mismatches, and
-   * verify is_active = true so deactivated members are blocked. */
-  const { data: member } = await supabase
-    .from('authorized_members')
-    .select('id')
-    .eq('email', user.email!.toLowerCase())
-    .eq('is_active', true)
-    .single();
+  /* Step 2: Check Skool community membership via SECURITY DEFINER function.
+   * Bypasses RLS to avoid the chicken-and-egg problem where users need
+   * authorization to read the authorization table. */
+  const { data: isMember } = await supabase
+    .rpc('check_membership', { user_email: user.email!.toLowerCase() });
 
-  if (!member) {
+  if (!isMember) {
     redirect('/unauthorized');
   }
 
