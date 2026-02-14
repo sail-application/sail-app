@@ -49,7 +49,7 @@ export default function UnauthorizedPage() {
         <div className="flex flex-col gap-3">
           {/* Link to join the Skool community (placeholder URL) */}
           <a
-            href="https://www.skool.com/sa-picture-day"
+            href="https://www.skool.com/volume-photography-1922/about"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 text-white font-medium h-10 px-4 hover:bg-brand-700 transition-colors"
