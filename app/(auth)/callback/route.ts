@@ -57,11 +57,15 @@ export async function GET(request: Request) {
       );
     }
 
-    /* Check if the user's email is in the authorized_members table */
+    /* Check if the user's email is in the authorized_members table.
+     * We lowercase the email to avoid case-sensitivity mismatches between
+     * Google OAuth (which may return mixed case) and the stored email.
+     * We also verify is_active = true so deactivated members can't log in. */
     const { data: member } = await supabase
       .from('authorized_members')
       .select('id')
-      .eq('email', user.email)
+      .eq('email', user.email.toLowerCase())
+      .eq('is_active', true)
       .single();
 
     if (!member) {
