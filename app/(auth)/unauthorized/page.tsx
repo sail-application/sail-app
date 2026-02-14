@@ -40,9 +40,9 @@ export default function UnauthorizedPage() {
 
         {/* Explanation */}
         <p className="text-foreground/60 mb-6 leading-relaxed">
-          SAIL is exclusively available to members of the SA Picture Day
-          Skool community. To get access, join our community and then
-          sign in again.
+          SAIL is exclusively available to members of the SAIL community.
+          To get access, join our community and then sign in again once
+          you are approved.
         </p>
 
         {/* Action links */}
@@ -54,7 +54,7 @@ export default function UnauthorizedPage() {
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 text-white font-medium h-10 px-4 hover:bg-brand-700 transition-colors"
           >
-            Join SA Picture Day on Skool
+            Join SAIL Community
           </a>
 
           {/* Sign out link — clears session and returns to login */}
