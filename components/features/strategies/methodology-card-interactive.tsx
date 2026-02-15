@@ -76,7 +76,7 @@ export function MethodologyCardInteractive({
         >
           <span
             className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-              isEnabled ? 'translate-x-4.5' : 'translate-x-0.5'
+              isEnabled ? 'translate-x-4' : 'translate-x-0.5'
             }`}
           />
         </button>

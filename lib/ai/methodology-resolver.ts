@@ -55,12 +55,13 @@ export async function resolveMethodology(
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const supabase = createAdminClient();
 
-    // Look up user's primary methodology preference
+    // Look up user's primary methodology preference (must also be enabled)
     const { data: pref } = await supabase
       .from('user_methodology_preferences')
       .select('methodology_id')
       .eq('user_id', userId)
       .eq('is_primary', true)
+      .eq('is_enabled', true)
       .single();
 
     let methodology: Methodology | null = null;
@@ -69,16 +70,30 @@ export async function resolveMethodology(
       methodology = await loadMethodologyById(pref.methodology_id);
     }
 
-    // Fallback: first active methodology by sort_order
+    // Fallback: first active methodology the user has enabled (or hasn't disabled)
     if (!methodology) {
-      const { data: fallback } = await supabase
+      // Get IDs the user has explicitly disabled
+      const { data: disabledPrefs } = await supabase
+        .from('user_methodology_preferences')
+        .select('methodology_id')
+        .eq('user_id', userId)
+        .eq('is_enabled', false);
+
+      const disabledIds = (disabledPrefs ?? []).map((p) => p.methodology_id);
+
+      let fallbackQuery = supabase
         .from('methodologies')
         .select('*')
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
-        .limit(1)
-        .single();
+        .limit(1);
 
+      // Exclude methodologies the user explicitly disabled
+      if (disabledIds.length > 0) {
+        fallbackQuery = fallbackQuery.not('id', 'in', `(${disabledIds.join(',')})`);
+      }
+
+      const { data: fallback } = await fallbackQuery.single();
       methodology = (fallback as Methodology) ?? null;
     }
 
