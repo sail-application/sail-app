@@ -25,6 +25,7 @@ import {
   BarChart3,
   BookOpen,
   Settings,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
@@ -49,11 +50,16 @@ function isActive(href: string, pathname: string): boolean {
   return pathname.startsWith(href);
 }
 
+interface MobileNavProps {
+  /** When true, shows an Admin link in the overflow menu */
+  isAdmin?: boolean;
+}
+
 /**
  * MobileNav — Bottom navigation bar for small screens.
  * Manages the "More" dropdown open/close state internally.
  */
-export function MobileNav() {
+export function MobileNav({ isAdmin }: MobileNavProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -72,8 +78,14 @@ export function MobileNav() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [moreOpen]);
 
+  /** Build the full overflow list — add Admin link if user has admin role */
+  const allOverflowItems = [
+    ...overflowItems,
+    ...(isAdmin ? [{ label: 'Admin', href: '/admin', icon: Shield }] as const : []),
+  ];
+
   /** Check if any overflow item is active (to highlight the "More" button) */
-  const overflowActive = overflowItems.some((item) => isActive(item.href, pathname));
+  const overflowActive = allOverflowItems.some((item) => isActive(item.href, pathname));
 
   return (
     <nav
@@ -130,7 +142,7 @@ export function MobileNav() {
                 'animate-in fade-in slide-in-from-bottom-2 duration-200'
               )}
             >
-              {overflowItems.map((item) => {
+              {allOverflowItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href, pathname);
                 return (
