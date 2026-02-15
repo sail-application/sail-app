@@ -1,30 +1,27 @@
 /**
- * app/api/admin/methodologies/reorder/route.ts
+ * app/api/methodologies/preferences/reorder/route.ts
  *
- * PUT /api/admin/methodologies/reorder — Bulk update sort order.
- * Admin-only. Accepts an array of {id, sort_order} pairs.
+ * PUT /api/methodologies/preferences/reorder
+ * Bulk update sort_order on user_methodology_preferences for the current user.
+ * Accepts { items: [{ methodology_id, sort_order }] }.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { reorderSchema } from '@/lib/utils/methodology-validators';
+import { userReorderSchema } from '@/lib/utils/methodology-validators';
 
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check admin role via SECURITY DEFINER RPC (avoids RLS issues)
-    const { data: isAdminUser } = await supabase.rpc('check_admin', { check_user_id: user.id });
-    if (!isAdminUser) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     const body = await request.json();
-    const parsed = reorderSchema.safeParse(body);
+    const parsed = userReorderSchema.safeParse(body);
+
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid input', details: parsed.error.issues },
@@ -32,19 +29,25 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Update each methodology's sort_order
+    // Upsert each preference with the new sort_order
     const updates = parsed.data.items.map((item) =>
       supabase
-        .from('methodologies')
-        .update({ sort_order: item.sort_order })
-        .eq('id', item.id),
+        .from('user_methodology_preferences')
+        .upsert(
+          {
+            user_id: user.id,
+            methodology_id: item.methodology_id,
+            sort_order: item.sort_order,
+          },
+          { onConflict: 'user_id,methodology_id' },
+        ),
     );
 
     await Promise.all(updates);
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[API] reorder error:', error);
+    console.error('[API] user preferences reorder error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

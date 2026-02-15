@@ -168,6 +168,7 @@ export interface UserMethodologyPreference {
   is_enabled: boolean;
   is_primary: boolean;
   proficiency_level: 'beginner' | 'intermediate' | 'advanced';
+  sort_order: number | null;
   started_at: string;
   last_used_at: string | null;
   next_review_at: string | null;

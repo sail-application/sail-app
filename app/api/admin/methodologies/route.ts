@@ -11,14 +11,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createMethodologySchema } from '@/lib/utils/methodology-validators';
 
-/** Helper: checks if the current user is an admin */
+/** Helper: checks if the current user is an admin via SECURITY DEFINER RPC */
 async function isAdmin(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', userId)
-    .eq('role', 'admin')
-    .single();
+  const { data } = await supabase.rpc('check_admin', { check_user_id: userId });
   return !!data;
 }
 

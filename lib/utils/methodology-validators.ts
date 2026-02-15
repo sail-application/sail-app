@@ -84,6 +84,13 @@ export const createMethodologySchema = z.object({
   success_signals: z.array(z.object({
     name: z.string(), description: z.string(), significance: z.string(),
   })).default([]),
+  learning_objectives: z.array(z.object({
+    statement: z.string(), bloom_level: z.string(), assessment_criteria: z.string(),
+  })).default([]),
+  concept_chunks: z.array(z.object({
+    id: z.string(), title: z.string(), type: z.string(), content: z.string(),
+    estimated_minutes: z.number(), prerequisite_chunks: z.array(z.string()),
+  })).default([]),
   access_tier: z.enum(['free', 'pro', 'team']).default('pro'),
   trademark_attribution: z.string().optional(),
   sort_order: z.number().int().default(0),
@@ -100,11 +107,20 @@ export const updatePreferenceSchema = z.object({
   methodology_id: z.string().uuid(),
   is_enabled: z.boolean().optional(),
   is_primary: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+});
+
+/** Schema for bulk reordering user methodology preferences */
+export const userReorderSchema = z.object({
+  items: z.array(z.object({
+    methodology_id: z.string().uuid(),
+    sort_order: z.number().int(),
+  })),
 });
 
 /* ──────────────── Reorder ──────────────── */
 
-/** Schema for bulk reordering methodologies */
+/** Schema for bulk reordering methodologies (admin) */
 export const reorderSchema = z.object({
   items: z.array(z.object({
     id: z.string().uuid(),
