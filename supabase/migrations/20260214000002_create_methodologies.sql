@@ -69,18 +69,29 @@ CREATE TABLE IF NOT EXISTS methodologies (
   sort_order INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT true,
 
-  -- Full-text search vector (auto-generated)
-  search_vector tsvector GENERATED ALWAYS AS (
-    setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(author, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(tagline, '')), 'B') ||
-    setweight(to_tsvector('english', coalesce(description, '')), 'C') ||
-    setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'B')
-  ) STORED,
+  -- Full-text search vector (maintained by trigger below)
+  search_vector tsvector,
 
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Trigger function to keep search_vector in sync on insert/update
+CREATE OR REPLACE FUNCTION methodologies_search_vector_update() RETURNS trigger AS $$
+BEGIN
+  NEW.search_vector :=
+    setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.author, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(NEW.tagline, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(NEW.description, '')), 'C') ||
+    setweight(to_tsvector('english', coalesce(array_to_string(NEW.tags, ' '), '')), 'B');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_methodologies_search_vector
+  BEFORE INSERT OR UPDATE ON methodologies
+  FOR EACH ROW EXECUTE FUNCTION methodologies_search_vector_update();
 
 -- Enable Row Level Security
 ALTER TABLE methodologies ENABLE ROW LEVEL SECURITY;
