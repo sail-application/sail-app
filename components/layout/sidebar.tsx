@@ -25,6 +25,7 @@ import {
   BarChart3,
   BookOpen,
   Settings,
+  Shield,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -53,11 +54,16 @@ function isActive(href: string, pathname: string): boolean {
   return pathname.startsWith(href);
 }
 
+interface SidebarProps {
+  /** When true, shows an Admin link in the bottom section */
+  isAdmin?: boolean;
+}
+
 /**
  * Sidebar — The main left-hand navigation panel for the dashboard.
  * Manages its own collapsed/expanded state via useState.
  */
-export function Sidebar() {
+export function Sidebar({ isAdmin }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
@@ -107,8 +113,26 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom section: Settings link and collapse toggle */}
+      {/* Bottom section: Admin link (admin only), Settings, and collapse toggle */}
       <div className="flex flex-col gap-1 px-2 py-4 border-t border-[var(--glass-border)]">
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className={cn(
+              'flex items-center gap-3 rounded-xl px-3 py-2.5',
+              'text-sm font-medium transition-colors duration-150',
+              isActive('/admin', pathname)
+                ? 'bg-brand-600/15 text-brand-600'
+                : 'text-foreground/60 hover:bg-white/10 hover:text-foreground',
+              collapsed && 'justify-center px-0'
+            )}
+            title={collapsed ? 'Admin' : undefined}
+          >
+            <Shield className="h-5 w-5 shrink-0" />
+            {!collapsed && <span>Admin</span>}
+          </Link>
+        )}
+
         <Link
           href="/dashboard/settings"
           className={cn(

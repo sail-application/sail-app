@@ -47,10 +47,18 @@ export default async function DashboardLayout({
     redirect('/unauthorized');
   }
 
+  /* Step 3: Check if user has admin role — controls Admin link visibility */
+  const { data: roleRecord } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single();
+  const isAdmin = roleRecord?.role === 'admin';
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar — visible on md+ screens, hidden on mobile */}
-      <Sidebar />
+      <Sidebar isAdmin={isAdmin} />
 
       {/* Main content area — fills remaining space */}
       <div className="flex flex-1 flex-col min-w-0">
@@ -63,7 +71,7 @@ export default async function DashboardLayout({
         </main>
 
         {/* Mobile bottom navigation — visible on mobile, hidden on md+ */}
-        <MobileNav />
+        <MobileNav isAdmin={isAdmin} />
       </div>
     </div>
   );
