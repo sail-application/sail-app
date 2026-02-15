@@ -2,8 +2,8 @@
  * app/api/ai/analyze/route.ts
  *
  * Post-call analysis endpoint. Accepts a call transcript (and optional call
- * type) and uses the AI provider (feature = 'analyzer') to produce a
- * structured scorecard based on Paul Cherry's "Questions That Sell" methodology.
+ * type / methodology override) and uses the AI provider (feature = 'analyzer')
+ * to produce a structured scorecard based on the user's active methodology.
  *
  * Auth: Required (Supabase session via cookies)
  * Rate limit: 10 requests / 60 seconds per user (analysis is expensive)
@@ -19,6 +19,8 @@ import { z } from 'zod/v4';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { aiChat } from '@/lib/ai/provider';
+import { resolveMethodology } from '@/lib/ai/methodology-resolver';
+import { composeSystemPrompt } from '@/lib/ai/prompt-composer';
 
 /** Rate limiter scoped to this route: 10 requests per 60-second window */
 const limiter = rateLimit({ limit: 10, windowMs: 60_000 });
@@ -29,28 +31,9 @@ const analyzeRequestSchema = z.object({
   transcript: z.string().min(10, 'Transcript must be at least 10 characters.'),
   /** Optional call type for more targeted analysis (e.g. 'cold-call', 'follow-up') */
   callType: z.string().optional(),
+  /** Optional methodology override (uses user's primary if not provided) */
+  methodologyId: z.string().uuid().optional(),
 });
-
-/**
- * System prompt that instructs the AI to analyze the call using Paul Cherry's
- * "Questions That Sell" methodology (Sure -> Want To -> Have To progression).
- */
-const ANALYZER_SYSTEM_PROMPT = `You are an expert sales call analyst specializing in Paul Cherry's "Questions That Sell" methodology. Analyze the following call transcript and provide a structured scorecard.
-
-Evaluate the call on these dimensions:
-1. **Question Quality** — Did the rep use open-ended questions? Were they thought-provoking?
-2. **Sure → Want To → Have To Progression** — Did the rep guide the prospect through Paul Cherry's motivation stages?
-3. **Active Listening** — Did the rep demonstrate they heard the prospect (paraphrasing, follow-up questions)?
-4. **Pain Discovery** — Were the prospect's core pain points uncovered?
-5. **Value Alignment** — Did the rep connect their solution to the prospect's stated needs?
-6. **Next Steps** — Was a clear next action established?
-
-For each dimension, provide:
-- A score from 1-10
-- A brief explanation of what was done well or poorly
-- One specific improvement suggestion
-
-End with an overall score and a 2-3 sentence summary of the rep's performance.`;
 
 /**
  * POST /api/ai/analyze
@@ -95,27 +78,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /* ── 4. Build the user message with transcript and optional call type ── */
-    const { transcript, callType } = parsed.data;
+    /* ── 4. Resolve the user's active methodology ── */
+    const { transcript, callType, methodologyId } = parsed.data;
+    const methodology = await resolveMethodology(user.id, methodologyId);
+
+    /* ── 5. Compose methodology-aware system prompt ── */
+    const systemMessages = composeSystemPrompt('analyzer', methodology);
+
+    /* ── 6. Build the user message with transcript and optional call type ── */
     const userMessage = callType
       ? `Call type: ${callType}\n\nTranscript:\n${transcript}`
       : `Transcript:\n${transcript}`;
 
-    /* ── 5. Call the AI provider with the analyzer feature and system prompt ── */
+    /* ── 7. Call the AI provider with composed prompt ── */
     const response = await aiChat(
       {
         messages: [
-          { role: 'system', content: ANALYZER_SYSTEM_PROMPT },
+          ...systemMessages,
           { role: 'user', content: userMessage },
         ],
         feature: 'analyzer',
+        methodologyId: methodology?.id,
       },
       user.id
     );
 
-    /* ── 6. Return the analysis result ── */
+    /* ── 8. Return the analysis result ── */
     return NextResponse.json({
       analysis: response.content,
+      methodology: methodology ? { id: methodology.id, name: methodology.name } : null,
       tokensUsed: response.tokensUsed,
       provider: response.provider,
       model: response.model,

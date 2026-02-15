@@ -11,9 +11,6 @@
 #   npx supabase migration new <name> — Create a new migration file
 # ============================================================================
 
-[project]
-id = "your-project-ref-here"
-
 [api]
 # Port to use for the API URL
 port = 54321

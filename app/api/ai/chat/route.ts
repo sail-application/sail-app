@@ -6,6 +6,10 @@
  * server-side AI provider abstraction routes the request to the configured
  * model (Gemini, Claude, OpenAI, etc.).
  *
+ * When no system message is provided in the messages array, the endpoint
+ * auto-resolves the user's active methodology and composes a methodology-aware
+ * system prompt using the prompt composer.
+ *
  * Auth: Required (Supabase session via cookies)
  * Rate limit: 30 requests / 60 seconds per user
  *
@@ -20,6 +24,8 @@ import { z } from 'zod/v4';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit } from '@/lib/utils/rate-limit';
 import { aiChat } from '@/lib/ai/provider';
+import { resolveMethodology } from '@/lib/ai/methodology-resolver';
+import { composeSystemPrompt } from '@/lib/ai/prompt-composer';
 
 /** Rate limiter scoped to this route: 30 requests per 60-second window */
 const limiter = rateLimit({ limit: 30, windowMs: 60_000 });
@@ -37,6 +43,8 @@ const chatRequestSchema = z.object({
     .min(1),
   /** Which SAIL feature is making this request (determines AI provider/model) */
   feature: z.enum(['live-call', 'practice', 'email', 'analyzer', 'strategies']),
+  /** Optional methodology override (uses user's primary if not provided) */
+  methodologyId: z.string().uuid().optional(),
 });
 
 /**
@@ -83,11 +91,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /* ── 4. Call the AI provider through the abstraction layer ── */
-    const { messages, feature } = parsed.data;
-    const response = await aiChat({ messages, feature }, user.id);
+    /* ── 4. Resolve methodology and inject system prompt if needed ── */
+    const { messages, feature, methodologyId } = parsed.data;
+    const hasSystemMessage = messages.some((m) => m.role === 'system');
 
-    /* ── 5. Return the AI response ── */
+    let finalMessages = [...messages];
+
+    if (!hasSystemMessage) {
+      const methodology = await resolveMethodology(user.id, methodologyId);
+      const systemMessages = composeSystemPrompt(feature, methodology);
+      finalMessages = [...systemMessages, ...messages];
+    }
+
+    /* ── 5. Call the AI provider through the abstraction layer ── */
+    const response = await aiChat(
+      { messages: finalMessages, feature, methodologyId },
+      user.id,
+    );
+
+    /* ── 6. Return the AI response ── */
     return NextResponse.json({
       content: response.content,
       tokensUsed: response.tokensUsed,

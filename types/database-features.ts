@@ -18,6 +18,8 @@ export interface EmailConversation {
   messages: unknown[];
   draft_email: string | null;
   previous_communication: string | null;
+  /** Which methodology guided email composition */
+  methodology_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +40,10 @@ export interface CallHistory {
   pinned_insights: Record<string, unknown>;
   score: number | null;
   follow_up_email: string | null;
+  /** Which methodology was active when this call was analyzed */
+  methodology_id: string | null;
+  /** Per-dimension scores from the methodology's scoring rubric */
+  methodology_scores: unknown[];
   created_at: string;
   updated_at: string;
 }
@@ -77,14 +83,18 @@ export interface PracticeSession {
   messages: unknown[];
   /** AI-generated feedback on the user's performance */
   feedback: Record<string, unknown>;
-  /** Paul Cherry commitment stage: Sure → Want To → Have To */
+  /** Methodology stage reached (methodology-specific, no longer Paul Cherry only) */
   commitment_stage: string | null;
+  /** Which methodology was active during this practice session */
+  methodology_id: string | null;
+  /** Per-dimension scores from the methodology's scoring rubric */
+  methodology_scores: unknown[];
   created_at: string;
 }
 
 /* ────────────────────── Strategies Library ───────────────────────── */
 
-/** Row in `strategies` — Paul Cherry methodology reference cards */
+/** Row in `strategies` — methodology technique reference cards */
 export interface Strategy {
   id: string;
   title: string;
@@ -96,6 +106,10 @@ export interface Strategy {
   examples: unknown[];
   /** Searchable tags for filtering */
   tags: string[];
+  /** Parent methodology this technique belongs to */
+  methodology_id: string | null;
+  /** True if this technique applies across all methodologies */
+  is_universal: boolean;
   sort_order: number;
   is_active: boolean;
   created_at: string;
