@@ -1,31 +1,85 @@
 /**
- * app/(dashboard)/strategies/page.tsx — Strategies Library placeholder.
+ * app/(dashboard)/strategies/page.tsx — Methodologies Library listing.
  *
- * Server Component placeholder for the Strategies Library feature.
- * Displays the feature name, icon, and "Coming soon" message.
- * Will be replaced with a searchable library of Paul Cherry's
- * "Questions That Sell" methodology techniques.
+ * Server Component that fetches and displays all active methodologies
+ * in a searchable, filterable card grid. Replaces the old placeholder.
+ *
+ * Search and category filtering happen via URL params, managed by
+ * the StrategiesSearch client component.
  */
 
 import type { Metadata } from 'next';
-import { BookOpen } from 'lucide-react';
-import { GlassPanel } from '@/components/ui/glass-panel';
+import { Suspense } from 'react';
+import { createClient } from '@/lib/supabase/server';
+import { StrategiesHeader } from '@/components/features/strategies/strategies-header';
+import { StrategiesSearch } from '@/components/features/strategies/strategies-search';
+import { MethodologyGrid } from '@/components/features/strategies/methodology-grid';
+import { Spinner } from '@/components/ui/spinner';
 
 export const metadata: Metadata = {
-  title: 'Strategies Library',
+  title: 'Methodologies Library',
 };
 
-/** StrategiesPage — Placeholder for the methodology techniques library. */
-export default function StrategiesPage() {
+interface PageProps {
+  searchParams: Promise<{ search?: string; category?: string }>;
+}
+
+export default async function StrategiesPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const supabase = await createClient();
+
+  // Build the query for listing (no AI content — just display fields)
+  let query = supabase
+    .from('methodologies')
+    .select(
+      'id, name, slug, author, tagline, icon, category, relevance_rating, complexity_level, tags, access_tier, sort_order, is_active, trademark_attribution',
+      { count: 'exact' },
+    )
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  if (params.category) {
+    query = query.eq('category', params.category);
+  }
+
+  if (params.search) {
+    query = query.textSearch('search_vector', params.search, { type: 'websearch' });
+  }
+
+  const { data: methodologies, count } = await query;
+
+  // Fetch technique counts per methodology
+  const ids = (methodologies ?? []).map((m) => m.id);
+  let techniqueCounts: Record<string, number> = {};
+
+  if (ids.length > 0) {
+    const { data: strategies } = await supabase
+      .from('strategies')
+      .select('methodology_id')
+      .in('methodology_id', ids)
+      .eq('is_active', true);
+
+    if (strategies) {
+      techniqueCounts = strategies.reduce((acc, s) => {
+        const mid = s.methodology_id as string;
+        acc[mid] = (acc[mid] ?? 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+    }
+  }
+
   return (
-    <GlassPanel className="flex flex-col items-center justify-center p-12 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600/15 text-brand-600 mb-4">
-        <BookOpen className="h-7 w-7" />
-      </div>
-      <h2 className="text-2xl font-bold tracking-tight mb-2">Strategies Library</h2>
-      <p className="text-foreground/60 max-w-md">
-        Searchable Paul Cherry &quot;Questions That Sell&quot; methodology techniques. Coming soon.
-      </p>
-    </GlassPanel>
+    <div className="space-y-6">
+      <StrategiesHeader total={count ?? 0} />
+
+      <Suspense fallback={<Spinner />}>
+        <StrategiesSearch />
+      </Suspense>
+
+      <MethodologyGrid
+        methodologies={methodologies ?? []}
+        techniqueCounts={techniqueCounts}
+      />
+    </div>
   );
 }

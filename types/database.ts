@@ -34,6 +34,15 @@ export type {
   Strategy,
 } from './database-features';
 
+export type {
+  Methodology,
+  UserMethodologyPreference,
+} from './methodology';
+
+export type {
+  MethodologyEvent,
+} from './coaching-events';
+
 /* ── Import concrete types needed for the Database wrapper ── */
 
 import type {
@@ -56,6 +65,9 @@ import type {
   PracticeSession,
   Strategy,
 } from './database-features';
+
+import type { Methodology, UserMethodologyPreference } from './methodology';
+import type { MethodologyEvent } from './coaching-events';
 
 /* ── Helper: generates Row / Insert / Update shapes per table ── */
 
@@ -100,6 +112,9 @@ export interface Database {
       user_notes: TableDefinition<UserNote>;
       practice_sessions: TableDefinition<PracticeSession>;
       strategies: TableDefinition<Strategy>;
+      methodologies: TableDefinition<Methodology>;
+      user_methodology_preferences: TableDefinition<UserMethodologyPreference>;
+      methodology_events: TableDefinition<MethodologyEvent>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

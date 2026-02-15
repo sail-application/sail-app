@@ -21,6 +21,7 @@ import {
   Users,
   FileText,
   Webhook,
+  BookOpen,
 } from 'lucide-react';
 import {
   Card,
@@ -35,6 +36,13 @@ export const metadata: Metadata = {
 
 /** Admin section definitions for the card grid */
 const adminSections = [
+  {
+    title: 'Methodologies',
+    description: 'Manage sales methodologies, techniques, and AI coaching content.',
+    href: '/admin/strategies',
+    icon: BookOpen,
+    ready: true,
+  },
   {
     title: 'AI Providers',
     description: 'Configure AI models per feature (Gemini, Claude, OpenAI, DeepSeek).',
@@ -65,7 +73,10 @@ const adminSections = [
     href: '/webhooks',
     icon: Webhook,
   },
-] as const;
+] as const satisfies ReadonlyArray<{
+  title: string; description: string; href: string;
+  icon: typeof Cpu; ready?: boolean;
+}>;
 
 /** AdminPage — The admin dashboard with a grid of section cards. */
 export default function AdminPage() {
@@ -94,9 +105,11 @@ export default function AdminPage() {
                     <CardTitle>{section.title}</CardTitle>
                   </div>
                   <CardDescription>{section.description}</CardDescription>
-                  <span className="inline-block mt-2 text-xs text-foreground/40 bg-foreground/5 px-2 py-0.5 rounded">
-                    Coming soon
-                  </span>
+                  {'ready' in section && section.ready ? null : (
+                    <span className="inline-block mt-2 text-xs text-foreground/40 bg-foreground/5 px-2 py-0.5 rounded">
+                      Coming soon
+                    </span>
+                  )}
                 </CardHeader>
               </Card>
             </Link>

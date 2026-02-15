@@ -15,7 +15,11 @@ import type {
   AiCompletionRequest,
   AiCompletionResponse,
 } from '@/types/ai';
+import type { AiProviderInterface } from '@/types/ai';
 import { GeminiProvider } from './gemini';
+import { OpenAiProvider } from './openai';
+import { AnthropicProvider } from './anthropic';
+import { DeepSeekProvider } from './deepseek';
 import { trackUsage } from './usage-tracker';
 
 /* ───────────────── Config Cache ───────────────── */
@@ -45,28 +49,44 @@ const DEFAULT_CONFIG: Omit<CachedConfig, 'cachedAt'> = {
 
 /* ───────────────── Provider Registry ───────────────── */
 
-/** Singleton Gemini provider instance (created once, reused for all calls). */
-const geminiProvider = new GeminiProvider();
+/**
+ * Lazy-initialized provider instances. Each provider is created on first use
+ * and reused for all subsequent calls. This avoids instantiating providers
+ * whose API keys aren't configured.
+ */
+const providerInstances = new Map<AiProvider, AiProviderInterface>();
 
 /**
  * Returns the provider implementation for the given provider key.
- * Currently only Gemini is implemented — add Claude/OpenAI/DeepSeek here
- * when those providers are needed.
+ * Lazily creates provider instances on first use.
  */
-function getProviderInstance(provider: AiProvider) {
+function getProviderInstance(provider: AiProvider): AiProviderInterface {
+  const existing = providerInstances.get(provider);
+  if (existing) return existing;
+
+  let instance: AiProviderInterface;
   switch (provider) {
     case 'gemini':
-      return geminiProvider;
-    // Future providers:
-    // case 'claude': return claudeProvider;
-    // case 'openai': return openaiProvider;
-    // case 'deepseek': return deepseekProvider;
+      instance = new GeminiProvider();
+      break;
+    case 'openai':
+      instance = new OpenAiProvider();
+      break;
+    case 'claude':
+      instance = new AnthropicProvider();
+      break;
+    case 'deepseek':
+      instance = new DeepSeekProvider();
+      break;
     default:
       console.warn(
-        `[AI] Provider "${provider}" not implemented — falling back to Gemini`,
+        `[AI] Provider "${provider}" not recognized — falling back to Gemini`,
       );
-      return geminiProvider;
+      instance = new GeminiProvider();
   }
+
+  providerInstances.set(provider, instance);
+  return instance;
 }
 
 /* ───────────────── Config Loader ───────────────── */

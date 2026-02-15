@@ -39,6 +39,8 @@ export interface AiCompletionRequest {
   temperature?: number;
   /** When true, the provider should return a streaming response */
   stream?: boolean;
+  /** Active methodology ID — used by prompt composer to inject methodology context */
+  methodologyId?: string;
 }
 
 /**
