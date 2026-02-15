@@ -2,9 +2,8 @@
  * components/features/strategies/admin/methodology-form.tsx
  *
  * Client Component — create/edit form for a methodology.
- * Handles display fields, media (videos/books), and tags.
- * AI coaching fields (prompt, rubric, stages) are edited as raw JSON
- * for now — a structured editor is deferred.
+ * Handles display fields, media (videos/books), tags, and AI coaching data.
+ * AI coaching fields are managed by the AiDataFields sub-component.
  */
 
 'use client';
@@ -18,6 +17,7 @@ import { VideoFields } from './video-fields';
 import { BookFields } from './book-fields';
 import { TagInput } from './tag-input';
 import { SelectField, TextareaField } from './form-fields';
+import { AiDataFields } from './ai-data-fields';
 import type { Methodology, MethodologyVideo, MethodologyBook } from '@/types/methodology';
 
 interface MethodologyFormProps {
@@ -34,7 +34,7 @@ export function MethodologyForm({ methodology }: MethodologyFormProps) {
   const router = useRouter();
   const isEdit = !!methodology;
 
-  /* ── Form state ── */
+  /* ── Basic form state ── */
   const [name, setName] = useState(methodology?.name ?? '');
   const [slug, setSlug] = useState(methodology?.slug ?? '');
   const [author, setAuthor] = useState(methodology?.author ?? '');
@@ -54,6 +54,33 @@ export function MethodologyForm({ methodology }: MethodologyFormProps) {
   const [videos, setVideos] = useState<MethodologyVideo[]>(methodology?.videos ?? []);
   const [books, setBooks] = useState<MethodologyBook[]>(methodology?.books ?? []);
   const [systemPrompt, setSystemPrompt] = useState(methodology?.system_prompt_template ?? '');
+
+  /* ── AI coaching data state ── */
+  const [featurePromptOverrides, setFeaturePromptOverrides] = useState<Record<string, string>>(
+    methodology?.feature_prompt_overrides ?? {},
+  );
+  const [vocabulary, setVocabulary] = useState<Record<string, string>>(
+    methodology?.vocabulary ?? {},
+  );
+  const [scoringRubric, setScoringRubric] = useState<unknown[]>(
+    methodology?.scoring_rubric ?? [],
+  );
+  const [stages, setStages] = useState<unknown[]>(methodology?.stages ?? []);
+  const [questionTypes, setQuestionTypes] = useState<unknown[]>(
+    methodology?.question_types ?? [],
+  );
+  const [antiPatterns, setAntiPatterns] = useState<unknown[]>(
+    methodology?.anti_patterns ?? [],
+  );
+  const [successSignals, setSuccessSignals] = useState<unknown[]>(
+    methodology?.success_signals ?? [],
+  );
+  const [learningObjectives, setLearningObjectives] = useState<unknown[]>(
+    methodology?.learning_objectives ?? [],
+  );
+  const [conceptChunks, setConceptChunks] = useState<unknown[]>(
+    methodology?.concept_chunks ?? [],
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +105,11 @@ export function MethodologyForm({ methodology }: MethodologyFormProps) {
       is_active: isActive, trademark_attribution: trademark || undefined,
       tags, videos, books,
       system_prompt_template: systemPrompt || undefined,
+      feature_prompt_overrides: featurePromptOverrides,
+      vocabulary, scoring_rubric: scoringRubric,
+      stages, question_types: questionTypes,
+      anti_patterns: antiPatterns, success_signals: successSignals,
+      learning_objectives: learningObjectives, concept_chunks: conceptChunks,
     };
 
     try {
@@ -166,6 +198,34 @@ export function MethodologyForm({ methodology }: MethodologyFormProps) {
           placeholder="AI system prompt for this methodology…" rows={6} />
       </GlassPanel>
 
+      {/* AI Coaching Data */}
+      <GlassPanel className="p-6 space-y-4">
+        <h3 className="font-semibold text-lg">AI Coaching Data</h3>
+        <p className="text-xs text-foreground/50">
+          Structured data that powers AI coaching features. Expand each section to edit.
+        </p>
+        <AiDataFields
+          featurePromptOverrides={featurePromptOverrides}
+          setFeaturePromptOverrides={setFeaturePromptOverrides}
+          vocabulary={vocabulary}
+          setVocabulary={setVocabulary}
+          scoringRubric={scoringRubric}
+          setScoringRubric={setScoringRubric}
+          stages={stages}
+          setStages={setStages}
+          questionTypes={questionTypes}
+          setQuestionTypes={setQuestionTypes}
+          antiPatterns={antiPatterns}
+          setAntiPatterns={setAntiPatterns}
+          successSignals={successSignals}
+          setSuccessSignals={setSuccessSignals}
+          learningObjectives={learningObjectives}
+          setLearningObjectives={setLearningObjectives}
+          conceptChunks={conceptChunks}
+          setConceptChunks={setConceptChunks}
+        />
+      </GlassPanel>
+
       {/* Media */}
       <GlassPanel className="p-6 space-y-4">
         <h3 className="font-semibold text-lg">Media</h3>
@@ -181,4 +241,3 @@ export function MethodologyForm({ methodology }: MethodologyFormProps) {
     </form>
   );
 }
-

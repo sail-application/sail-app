@@ -55,7 +55,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { methodology_id, is_enabled, is_primary } = parsed.data;
+    const { methodology_id, is_enabled, is_primary, sort_order } = parsed.data;
 
     // If setting as primary, first unset any existing primary
     if (is_primary) {
@@ -66,19 +66,22 @@ export async function PUT(request: NextRequest) {
         .eq('is_primary', true);
     }
 
+    // Build upsert payload — only include sort_order if explicitly provided
+    const upsertPayload: Record<string, unknown> = {
+      user_id: user.id,
+      methodology_id,
+      is_enabled: is_enabled ?? true,
+      is_primary: is_primary ?? false,
+      last_used_at: new Date().toISOString(),
+    };
+    if (sort_order !== undefined) {
+      upsertPayload.sort_order = sort_order;
+    }
+
     // Upsert the preference
     const { data, error } = await supabase
       .from('user_methodology_preferences')
-      .upsert(
-        {
-          user_id: user.id,
-          methodology_id,
-          is_enabled: is_enabled ?? true,
-          is_primary: is_primary ?? false,
-          last_used_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,methodology_id' },
-      )
+      .upsert(upsertPayload, { onConflict: 'user_id,methodology_id' })
       .select()
       .single();
 
