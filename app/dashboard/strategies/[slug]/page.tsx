@@ -58,14 +58,12 @@ export default async function MethodologyDetailPage({ params }: PageProps) {
     .order('sort_order', { ascending: true });
 
   // Check if user has admin role (for AI Data tab visibility)
+  // Uses SECURITY DEFINER RPC to bypass RLS
   let isAdmin = false;
   if (user) {
-    const { data: role } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-    isAdmin = role?.role === 'admin';
+    const { data } = await supabase
+      .rpc('check_admin', { check_user_id: user.id });
+    isAdmin = !!data;
   }
 
   // Fetch user's preference for this methodology (for enable/disable toggle)
