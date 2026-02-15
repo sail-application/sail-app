@@ -2,10 +2,10 @@
  * app/(dashboard)/strategies/page.tsx — Methodologies Library listing.
  *
  * Server Component that fetches and displays all active methodologies
- * in a searchable, filterable card grid. Replaces the old placeholder.
+ * in a searchable, filterable card grid.
  *
- * Search and category filtering happen via URL params, managed by
- * the StrategiesSearch client component.
+ * Filters: search (text), category (pill), level, author, tier (dropdowns).
+ * All managed via URL search params by StrategiesSearch client component.
  */
 
 import type { Metadata } from 'next';
@@ -21,7 +21,13 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ search?: string; category?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    category?: string;
+    level?: string;
+    author?: string;
+    tier?: string;
+  }>;
 }
 
 export default async function StrategiesPage({ searchParams }: PageProps) {
@@ -38,15 +44,29 @@ export default async function StrategiesPage({ searchParams }: PageProps) {
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
 
+  // Apply filters from URL search params
   if (params.category) {
     query = query.eq('category', params.category);
   }
-
+  if (params.level) {
+    query = query.eq('complexity_level', params.level);
+  }
+  if (params.author) {
+    query = query.eq('author', params.author);
+  }
+  if (params.tier) {
+    query = query.eq('access_tier', params.tier);
+  }
   if (params.search) {
     query = query.textSearch('search_vector', params.search, { type: 'websearch' });
   }
 
   const { data: methodologies, count } = await query;
+
+  // Build unique author list for the Author filter dropdown
+  const authors = [
+    ...new Set((methodologies ?? []).map((m) => m.author).filter(Boolean)),
+  ].sort();
 
   // Fetch technique counts per methodology
   const ids = (methodologies ?? []).map((m) => m.id);
@@ -73,7 +93,7 @@ export default async function StrategiesPage({ searchParams }: PageProps) {
       <StrategiesHeader total={count ?? 0} />
 
       <Suspense fallback={<Spinner />}>
-        <StrategiesSearch />
+        <StrategiesSearch authors={authors} />
       </Suspense>
 
       <MethodologyGrid

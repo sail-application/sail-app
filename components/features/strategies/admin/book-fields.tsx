@@ -2,7 +2,7 @@
  * components/features/strategies/admin/book-fields.tsx
  *
  * Client Component — dynamic list of book reference inputs.
- * Add/remove book entries (title, author, ISBN, URL, year).
+ * Add/remove book entries (title, author, ISBN, URL, year, cover URL).
  */
 
 'use client';
@@ -63,6 +63,11 @@ export function BookFields({ value, onChange }: BookFieldsProps) {
             placeholder="URL (optional)"
             value={book.url ?? ''}
             onChange={(e) => updateBook(idx, 'url', e.target.value)}
+          />
+          <Input
+            placeholder="Cover image URL (optional)"
+            value={book.cover_url ?? ''}
+            onChange={(e) => updateBook(idx, 'cover_url', e.target.value)}
           />
           <div className="flex gap-2 items-end">
             <Input

@@ -22,6 +22,7 @@ export const bookSchema = z.object({
   isbn: z.string().optional(),
   url: z.string().url().optional(),
   year: z.number().int().optional(),
+  cover_url: z.string().url().optional(),
 });
 
 export const scoringDimensionSchema = z.object({

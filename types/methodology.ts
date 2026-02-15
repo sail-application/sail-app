@@ -81,6 +81,8 @@ export interface MethodologyBook {
   isbn?: string;
   url?: string;
   year?: number;
+  /** Book cover image URL (e.g. Open Library ISBN cover) */
+  cover_url?: string;
 }
 
 /** Learning objective (Bloom's taxonomy aligned) */

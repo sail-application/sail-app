@@ -2,7 +2,7 @@
  * components/features/strategies/book-card.tsx
  *
  * Server Component — book reference card.
- * Shows title, author, year, and optional link.
+ * Shows cover image (if available), title, author, year, and optional link.
  */
 
 import { BookOpen, ExternalLink } from 'lucide-react';
@@ -19,13 +19,26 @@ export function BookCard({ book }: BookCardProps) {
     ? { href: book.url, target: '_blank' as const, rel: 'noopener noreferrer' }
     : {};
 
+  const hasCover = book.cover_url && book.cover_url.length > 0;
+
   return (
     <Wrapper {...linkProps} className="group block">
       <GlassPanel blur="light" className="p-4 transition-all group-hover:shadow-md">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600/15 text-brand-600">
-            <BookOpen className="h-5 w-5" />
-          </div>
+          {/* Cover image or fallback icon */}
+          {hasCover ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={book.cover_url}
+              alt={`Cover of ${book.title}`}
+              className="h-16 w-12 shrink-0 rounded-md object-cover bg-foreground/5"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-16 w-12 shrink-0 items-center justify-center rounded-md bg-brand-600/15 text-brand-600">
+              <BookOpen className="h-5 w-5" />
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold text-sm">{book.title}</h4>
             <p className="text-xs text-foreground/60 mt-0.5">
