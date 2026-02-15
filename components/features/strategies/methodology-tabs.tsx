@@ -2,7 +2,7 @@
  * components/features/strategies/methodology-tabs.tsx
  *
  * Client Component — tabbed content for methodology detail page.
- * Tabs: Overview | Techniques | Videos | Books
+ * Tabs: Overview | Techniques | Videos | Books | AI Data (admin-only)
  */
 
 'use client';
@@ -12,17 +12,20 @@ import { GlassPanel } from '@/components/ui/glass-panel';
 import { TechniqueList } from './technique-list';
 import { VideoCard } from './video-card';
 import { BookCard } from './book-card';
+import { AiDataPanel } from './ai-data-panel';
 import type { Methodology, MethodologyVideo, MethodologyBook } from '@/types/methodology';
 import type { Strategy } from '@/types/database';
 
 interface MethodologyTabsProps {
   methodology: Methodology;
   strategies: Strategy[];
+  /** When true, the "AI Data" tab is shown (admin users only) */
+  isAdmin?: boolean;
 }
 
-type TabKey = 'overview' | 'techniques' | 'videos' | 'books';
+type TabKey = 'overview' | 'techniques' | 'videos' | 'books' | 'ai-data';
 
-export function MethodologyTabs({ methodology: m, strategies }: MethodologyTabsProps) {
+export function MethodologyTabs({ methodology: m, strategies, isAdmin }: MethodologyTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
   const videos = (m.videos ?? []) as MethodologyVideo[];
@@ -33,6 +36,8 @@ export function MethodologyTabs({ methodology: m, strategies }: MethodologyTabsP
     { key: 'techniques', label: 'Techniques', count: strategies.length },
     { key: 'videos', label: 'Videos', count: videos.length },
     { key: 'books', label: 'Books', count: books.length },
+    // AI Data tab only visible to admins
+    ...(isAdmin ? [{ key: 'ai-data' as TabKey, label: 'AI Data' }] : []),
   ];
 
   return (
@@ -65,6 +70,7 @@ export function MethodologyTabs({ methodology: m, strategies }: MethodologyTabsP
         {activeTab === 'techniques' && <TechniqueList strategies={strategies} />}
         {activeTab === 'videos' && <VideosTab videos={videos} />}
         {activeTab === 'books' && <BooksTab books={books} />}
+        {activeTab === 'ai-data' && isAdmin && <AiDataPanel methodology={m} />}
       </div>
     </div>
   );

@@ -1,11 +1,14 @@
 /**
  * components/features/strategies/methodology-detail-header.tsx
  *
- * Server Component — hero section for the methodology detail page.
+ * Hero section for the methodology detail page.
  * Shows name, author, tagline, category, relevance, complexity,
- * and trademark attribution.
+ * trademark attribution, and an enable/disable toggle.
  */
 
+'use client';
+
+import { useState } from 'react';
 import { Star, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -14,9 +17,43 @@ import type { Methodology } from '@/types/methodology';
 
 interface MethodologyDetailHeaderProps {
   methodology: Methodology;
+  /** Whether this methodology is currently enabled for the user */
+  isEnabled?: boolean;
+  /** The methodology UUID — needed for the preference API call */
+  methodologyId?: string;
 }
 
-export function MethodologyDetailHeader({ methodology: m }: MethodologyDetailHeaderProps) {
+export function MethodologyDetailHeader({
+  methodology: m,
+  isEnabled: initialEnabled = false,
+  methodologyId,
+}: MethodologyDetailHeaderProps) {
+  const [enabled, setEnabled] = useState(initialEnabled);
+  const [toggling, setToggling] = useState(false);
+
+  /** Toggle the user's enabled/disabled preference via the API */
+  async function handleToggle() {
+    if (!methodologyId || toggling) return;
+    setToggling(true);
+    try {
+      const res = await fetch('/api/methodologies/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          methodology_id: methodologyId,
+          is_enabled: !enabled,
+        }),
+      });
+      if (res.ok) {
+        setEnabled(!enabled);
+      }
+    } catch {
+      // Silently fail — user can retry
+    } finally {
+      setToggling(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Breadcrumb */}
@@ -63,6 +100,21 @@ export function MethodologyDetailHeader({ methodology: m }: MethodologyDetailHea
               </div>
             </div>
           </div>
+
+          {/* Enable/Disable toggle */}
+          {methodologyId && (
+            <button
+              onClick={handleToggle}
+              disabled={toggling}
+              className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                enabled
+                  ? 'bg-brand-600 text-white hover:bg-brand-700'
+                  : 'bg-foreground/10 text-foreground/60 hover:bg-foreground/15'
+              } disabled:opacity-50`}
+            >
+              {toggling ? 'Saving...' : enabled ? 'Enabled' : 'Disabled'}
+            </button>
+          )}
         </div>
 
         {/* Trademark attribution */}

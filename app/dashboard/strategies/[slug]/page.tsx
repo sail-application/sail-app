@@ -3,7 +3,7 @@
  *
  * Server Component that loads a single methodology by slug and displays
  * its full content: description, techniques, videos, books.
- * Also shows the user's preference state (enabled/primary toggle).
+ * Also checks admin role (for AI Data tab) and user preference (toggle).
  */
 
 import type { Metadata } from 'next';
@@ -34,6 +34,9 @@ export default async function MethodologyDetailPage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
 
+  // Get the current user
+  const { data: { user } } = await supabase.auth.getUser();
+
   // Fetch methodology by slug
   const { data: methodology, error } = await supabase
     .from('methodologies')
@@ -54,12 +57,44 @@ export default async function MethodologyDetailPage({ params }: PageProps) {
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
 
+  // Check if user has admin role (for AI Data tab visibility)
+  let isAdmin = false;
+  if (user) {
+    const { data: role } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+    isAdmin = role?.role === 'admin';
+  }
+
+  // Fetch user's preference for this methodology (for enable/disable toggle)
+  let isEnabled = slug === 'questions-that-sell'; // Paul Cherry ON by default
+  if (user) {
+    const { data: pref } = await supabase
+      .from('user_methodology_preferences')
+      .select('is_enabled')
+      .eq('user_id', user.id)
+      .eq('methodology_id', methodology.id)
+      .single();
+
+    // If a preference row exists, use it; otherwise fall back to default
+    if (pref) {
+      isEnabled = pref.is_enabled;
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <MethodologyDetailHeader methodology={methodology as Methodology} />
+      <MethodologyDetailHeader
+        methodology={methodology as Methodology}
+        isEnabled={isEnabled}
+        methodologyId={methodology.id}
+      />
       <MethodologyTabs
         methodology={methodology as Methodology}
         strategies={(strategies ?? []) as Strategy[]}
+        isAdmin={isAdmin}
       />
     </div>
   );

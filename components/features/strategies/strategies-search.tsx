@@ -1,7 +1,8 @@
 /**
  * components/features/strategies/strategies-search.tsx
  *
- * Client Component — search bar + category filter pills.
+ * Client Component — search bar + category pills + filter dropdowns.
+ * Filters: Level (complexity), Author (creator), Access Tier (price).
  * Uses URL params for state so searches are shareable/bookmarkable.
  */
 
@@ -19,11 +20,33 @@ const CATEGORIES = [
   { key: 'mindset', label: 'Mindset' },
 ];
 
-export function StrategiesSearch() {
+const LEVELS = [
+  { key: '', label: 'All Levels' },
+  { key: 'beginner', label: 'Beginner' },
+  { key: 'intermediate', label: 'Intermediate' },
+  { key: 'advanced', label: 'Advanced' },
+];
+
+const TIERS = [
+  { key: '', label: 'All Tiers' },
+  { key: 'free', label: 'Free' },
+  { key: 'pro', label: 'Pro' },
+  { key: 'team', label: 'Team' },
+];
+
+interface StrategiesSearchProps {
+  /** Unique author names from the active methodologies — for the Author filter */
+  authors?: string[];
+}
+
+export function StrategiesSearch({ authors = [] }: StrategiesSearchProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSearch = searchParams.get('search') ?? '';
   const currentCategory = searchParams.get('category') ?? '';
+  const currentLevel = searchParams.get('level') ?? '';
+  const currentAuthor = searchParams.get('author') ?? '';
+  const currentTier = searchParams.get('tier') ?? '';
 
   const updateParams = useCallback(
     (key: string, value: string) => {
@@ -37,6 +60,10 @@ export function StrategiesSearch() {
     },
     [router, searchParams],
   );
+
+  /* Shared styles for filter dropdowns */
+  const selectClass =
+    'px-3 py-2 rounded-xl bg-foreground/5 border border-foreground/10 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand-600/30';
 
   return (
     <div className="space-y-3">
@@ -70,6 +97,46 @@ export function StrategiesSearch() {
             {cat.label}
           </button>
         ))}
+      </div>
+
+      {/* Filter dropdowns row */}
+      <div className="flex flex-wrap gap-2">
+        {/* Level filter */}
+        <select
+          value={currentLevel}
+          onChange={(e) => updateParams('level', e.target.value)}
+          className={selectClass}
+          aria-label="Filter by level"
+        >
+          {LEVELS.map((l) => (
+            <option key={l.key} value={l.key}>{l.label}</option>
+          ))}
+        </select>
+
+        {/* Author filter — dynamically populated from data */}
+        <select
+          value={currentAuthor}
+          onChange={(e) => updateParams('author', e.target.value)}
+          className={selectClass}
+          aria-label="Filter by author"
+        >
+          <option value="">All Authors</option>
+          {authors.map((a) => (
+            <option key={a} value={a}>{a}</option>
+          ))}
+        </select>
+
+        {/* Access tier filter */}
+        <select
+          value={currentTier}
+          onChange={(e) => updateParams('tier', e.target.value)}
+          className={selectClass}
+          aria-label="Filter by access tier"
+        >
+          {TIERS.map((t) => (
+            <option key={t.key} value={t.key}>{t.label}</option>
+          ))}
+        </select>
       </div>
     </div>
   );
