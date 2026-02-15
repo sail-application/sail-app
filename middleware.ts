@@ -95,16 +95,14 @@ export async function middleware(request: NextRequest) {
   }
 
   // 5. Protect /admin — additionally require the 'admin' role
+  //    Uses a SECURITY DEFINER RPC to bypass RLS (auth.uid() can be
+  //    unreliable in middleware/server component Supabase clients)
   if (pathname.startsWith('/admin') && user && supabase) {
     try {
-      const { data: roleRecord, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
+      const { data: isAdmin } = await supabase
+        .rpc('check_admin', { check_user_id: user.id });
 
-      // If the query fails or the role isn't 'admin', bounce to dashboard
-      if (error || roleRecord?.role !== 'admin') {
+      if (!isAdmin) {
         return redirectToDashboard(request);
       }
     } catch {

@@ -36,15 +36,11 @@ export default async function AdminLayout({
     redirect('/login');
   }
 
-  /* Step 2: Check admin role in user_roles table */
-  const { data: roleRecord } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('role', 'admin')
-    .single();
+  /* Step 2: Check admin role via SECURITY DEFINER function (bypasses RLS) */
+  const { data: isAdmin } = await supabase
+    .rpc('check_admin', { check_user_id: user.id });
 
-  if (!roleRecord) {
+  if (!isAdmin) {
     /* Not an admin — send them back to the regular dashboard */
     redirect('/dashboard');
   }

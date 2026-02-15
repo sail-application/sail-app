@@ -47,13 +47,10 @@ export default async function DashboardLayout({
     redirect('/unauthorized');
   }
 
-  /* Step 3: Check if user has admin role — controls Admin link visibility */
-  const { data: roleRecord } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .single();
-  const isAdmin = roleRecord?.role === 'admin';
+  /* Step 3: Check if user has admin role — controls Admin link visibility.
+   * Uses SECURITY DEFINER RPC to bypass RLS (same pattern as check_membership) */
+  const { data: isAdmin } = await supabase
+    .rpc('check_admin', { check_user_id: user.id });
 
   return (
     <div className="flex min-h-screen">
