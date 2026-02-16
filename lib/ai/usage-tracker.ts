@@ -16,7 +16,8 @@
  *   - SUPABASE_SERVICE_ROLE_KEY
  */
 
-import type { AiCompletionResponse, AiFeature } from '@/types/ai';
+import type { AiCompletionResponse, AiFeature } from "@/types/ai";
+import { captureError } from "@/lib/sentry";
 
 /**
  * Logs token usage for a completed AI call. Fire-and-forget — this function
@@ -37,10 +38,10 @@ export function trackUsage(
     try {
       // Dynamic import keeps this module lightweight and avoids
       // circular dependency issues at module load time.
-      const { createAdminClient } = await import('@/lib/supabase/admin');
+      const { createAdminClient } = await import("@/lib/supabase/admin");
       const supabase = createAdminClient();
 
-      const { error } = await supabase.from('token_usage_logs').insert({
+      const { error } = await supabase.from("token_usage_logs").insert({
         user_id: userId,
         feature,
         provider: response.provider,
@@ -53,12 +54,15 @@ export function trackUsage(
 
       if (error) {
         // Log but don't throw — usage tracking failure must not break AI flow
-        console.error('[UsageTracker] Failed to insert usage log:', error.message);
+        captureError(new Error(`[UsageTracker] ${error.message}`), {
+          feature,
+          userId,
+        });
       }
     } catch (err) {
       // Catch everything — network errors, missing env vars, etc.
       // Usage tracking is non-critical; the AI response is already sent.
-      console.error('[UsageTracker] Unexpected error:', err);
+      captureError(err, { feature, userId });
     }
   })();
 }

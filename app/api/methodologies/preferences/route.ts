@@ -5,33 +5,43 @@
  * PUT  /api/methodologies/preferences — Update/create a preference
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { updatePreferenceSchema } from '@/lib/utils/methodology-validators';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { updatePreferenceSchema } from "@/lib/utils/methodology-validators";
+import { captureError } from "@/lib/sentry";
 
 /** GET — Fetch all preferences for the authenticated user */
 export async function GET() {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { data, error } = await supabase
-      .from('user_methodology_preferences')
-      .select('*')
-      .eq('user_id', user.id);
+      .from("user_methodology_preferences")
+      .select("*")
+      .eq("user_id", user.id);
 
     if (error) {
-      return NextResponse.json({ error: 'Failed to fetch preferences' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to fetch preferences" },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ preferences: data ?? [] });
   } catch (error) {
-    console.error('[API] preferences GET error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    captureError(error, { route: "/api/methodologies/preferences" });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -39,10 +49,13 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -50,7 +63,7 @@ export async function PUT(request: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Invalid request', details: parsed.error.issues },
+        { error: "Invalid request", details: parsed.error.issues },
         { status: 400 },
       );
     }
@@ -60,10 +73,10 @@ export async function PUT(request: NextRequest) {
     // If setting as primary, first unset any existing primary
     if (is_primary) {
       await supabase
-        .from('user_methodology_preferences')
+        .from("user_methodology_preferences")
         .update({ is_primary: false })
-        .eq('user_id', user.id)
-        .eq('is_primary', true);
+        .eq("user_id", user.id)
+        .eq("is_primary", true);
     }
 
     // Build upsert payload — only include sort_order if explicitly provided
@@ -80,19 +93,25 @@ export async function PUT(request: NextRequest) {
 
     // Upsert the preference
     const { data, error } = await supabase
-      .from('user_methodology_preferences')
-      .upsert(upsertPayload, { onConflict: 'user_id,methodology_id' })
+      .from("user_methodology_preferences")
+      .upsert(upsertPayload, { onConflict: "user_id,methodology_id" })
       .select()
       .single();
 
     if (error) {
-      console.error('[API] preferences PUT error:', error);
-      return NextResponse.json({ error: 'Failed to update preference' }, { status: 500 });
+      captureError(error, { route: "/api/methodologies/preferences" });
+      return NextResponse.json(
+        { error: "Failed to update preference" },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ preference: data });
   } catch (error) {
-    console.error('[API] preferences PUT error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    captureError(error, { route: "/api/methodologies/preferences" });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

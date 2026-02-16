@@ -12,7 +12,8 @@
  * hasn't selected one yet.
  */
 
-import type { Methodology } from '@/types/methodology';
+import type { Methodology } from "@/types/methodology";
+import { captureError, addAiBreadcrumb } from "@/lib/sentry";
 
 /* ──────────────── Cache ──────────────── */
 
@@ -52,16 +53,16 @@ export async function resolveMethodology(
   }
 
   try {
-    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { createAdminClient } = await import("@/lib/supabase/admin");
     const supabase = createAdminClient();
 
     // Look up user's primary methodology preference (must also be enabled)
     const { data: pref } = await supabase
-      .from('user_methodology_preferences')
-      .select('methodology_id')
-      .eq('user_id', userId)
-      .eq('is_primary', true)
-      .eq('is_enabled', true)
+      .from("user_methodology_preferences")
+      .select("methodology_id")
+      .eq("user_id", userId)
+      .eq("is_primary", true)
+      .eq("is_enabled", true)
       .single();
 
     let methodology: Methodology | null = null;
@@ -74,33 +75,42 @@ export async function resolveMethodology(
     if (!methodology) {
       // Get IDs the user has explicitly disabled
       const { data: disabledPrefs } = await supabase
-        .from('user_methodology_preferences')
-        .select('methodology_id')
-        .eq('user_id', userId)
-        .eq('is_enabled', false);
+        .from("user_methodology_preferences")
+        .select("methodology_id")
+        .eq("user_id", userId)
+        .eq("is_enabled", false);
 
       const disabledIds = (disabledPrefs ?? []).map((p) => p.methodology_id);
 
       let fallbackQuery = supabase
-        .from('methodologies')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
+        .from("methodologies")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
         .limit(1);
 
       // Exclude methodologies the user explicitly disabled
       if (disabledIds.length > 0) {
-        fallbackQuery = fallbackQuery.not('id', 'in', `(${disabledIds.join(',')})`);
+        fallbackQuery = fallbackQuery.not(
+          "id",
+          "in",
+          `(${disabledIds.join(",")})`,
+        );
       }
 
       const { data: fallback } = await fallbackQuery.single();
       methodology = (fallback as Methodology) ?? null;
     }
 
+    addAiBreadcrumb("Methodology resolved", {
+      userId,
+      methodologyId: methodology?.id,
+      methodologyName: methodology?.name,
+    });
     methodologyCache.set(cacheKey, { methodology, cachedAt: now });
     return methodology;
   } catch (err) {
-    console.error('[MethodologyResolver] Failed to resolve:', err);
+    captureError(err, { feature: "methodology-resolver", userId });
     return null;
   }
 }
@@ -117,14 +127,14 @@ async function loadMethodologyById(id: string): Promise<Methodology | null> {
   }
 
   try {
-    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { createAdminClient } = await import("@/lib/supabase/admin");
     const supabase = createAdminClient();
 
     const { data, error } = await supabase
-      .from('methodologies')
-      .select('*')
-      .eq('id', id)
-      .eq('is_active', true)
+      .from("methodologies")
+      .select("*")
+      .eq("id", id)
+      .eq("is_active", true)
       .single();
 
     if (error || !data) return null;
