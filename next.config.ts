@@ -41,9 +41,9 @@ export default withSentryConfig(nextConfig, {
   // (critical for sales tool users who often have blockers enabled)
   tunnelRoute: "/monitoring",
 
-  // Reduce bundle size — drop debug logs and unused replay features
+  // TODO: Re-enable excludeDebugStatements after Sentry is verified working
   bundleSizeOptimizations: {
-    excludeDebugStatements: true,
+    excludeDebugStatements: false,
     excludeReplayShadowDom: true,
     excludeReplayIframe: true,
   },
