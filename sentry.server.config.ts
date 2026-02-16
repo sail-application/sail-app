@@ -16,6 +16,7 @@ const isProd = process.env.NODE_ENV === "production";
 Sentry.init({
   dsn: "https://4637a4b439bee18482a2c260a21b27f1@o4510875821539328.ingest.us.sentry.io/4510892043206656",
   environment: isProd ? "production" : "development",
+  debug: !isProd, // Show SDK logs in dev to diagnose issues
 
   /* ── Performance ── */
   // 20% of transactions in prod to stay within free tier (~6K/month at 1K req/day)
