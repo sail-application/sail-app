@@ -13,8 +13,9 @@
  *   - SUPABASE_SERVICE_ROLE_KEY
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { captureError, trackWebhookReceived } from "@/lib/sentry";
 
 /** The shared secret used to verify requests actually come from Skool */
 const SKOOL_SECRET = process.env.SKOOL_WEBHOOK_SECRET;
@@ -26,13 +27,13 @@ const SKOOL_SECRET = process.env.SKOOL_WEBHOOK_SECRET;
 async function logWebhookEvent(
   eventType: string,
   payload: Record<string, unknown>,
-  status: 'processed' | 'failed',
-  errorMessage?: string
+  status: "processed" | "failed",
+  errorMessage?: string,
 ) {
   try {
     const supabase = createAdminClient();
-    await supabase.from('webhook_events').insert({
-      source: 'skool',
+    await supabase.from("webhook_events").insert({
+      source: "skool",
       event_type: eventType,
       event_id: `skool_${Date.now()}`,
       payload,
@@ -42,7 +43,7 @@ async function logWebhookEvent(
     });
   } catch (logError) {
     // Logging failure should never crash the webhook handler
-    console.error('[Skool Webhook] Failed to log event:', logError);
+    console.error("[Skool Webhook] Failed to log event:", logError);
   }
 }
 
@@ -54,18 +55,18 @@ async function handleMemberJoined(email: string, name?: string) {
   const supabase = createAdminClient();
 
   /* Upsert so re-joining members are simply reactivated */
-  const { error } = await supabase.from('authorized_members').upsert(
+  const { error } = await supabase.from("authorized_members").upsert(
     {
       email: email.toLowerCase(),
       name: name ?? null,
       is_active: true,
       joined_at: new Date().toISOString(),
     },
-    { onConflict: 'email' }
+    { onConflict: "email" },
   );
 
   if (error) {
-    console.error('[Skool] Failed to add authorized member:', error);
+    console.error("[Skool] Failed to add authorized member:", error);
     throw error;
   }
 
@@ -81,12 +82,12 @@ async function handleMemberLeft(email: string) {
   const supabase = createAdminClient();
 
   const { error } = await supabase
-    .from('authorized_members')
+    .from("authorized_members")
     .update({ is_active: false, left_at: new Date().toISOString() })
-    .eq('email', email.toLowerCase());
+    .eq("email", email.toLowerCase());
 
   if (error) {
-    console.error('[Skool] Failed to deactivate member:', error);
+    console.error("[Skool] Failed to deactivate member:", error);
     throw error;
   }
 
@@ -101,13 +102,13 @@ async function handleMemberLeft(email: string) {
 export async function POST(request: NextRequest) {
   try {
     /* ── 1. Validate the shared secret header ── */
-    const secret = request.headers.get('x-skool-secret');
+    const secret = request.headers.get("x-skool-secret");
 
     if (!SKOOL_SECRET || secret !== SKOOL_SECRET) {
-      console.warn('[Skool Webhook] Invalid or missing secret header');
+      console.warn("[Skool Webhook] Invalid or missing secret header");
       return NextResponse.json(
-        { error: 'Unauthorized. Invalid webhook secret.' },
-        { status: 401 }
+        { error: "Unauthorized. Invalid webhook secret." },
+        { status: 401 },
       );
     }
 
@@ -121,17 +122,18 @@ export async function POST(request: NextRequest) {
 
     if (!event || !email) {
       return NextResponse.json(
-        { error: 'Missing required fields: event, email.' },
-        { status: 400 }
+        { error: "Missing required fields: event, email." },
+        { status: 400 },
       );
     }
 
-    /* ── 3. Route to the appropriate handler ── */
+    /* ── 3. Track webhook receipt and route to the appropriate handler ── */
+    trackWebhookReceived("skool", event);
     switch (event) {
-      case 'member_joined':
+      case "member_joined":
         await handleMemberJoined(email, name);
         break;
-      case 'member_left':
+      case "member_left":
         await handleMemberLeft(email);
         break;
       default:
@@ -139,23 +141,23 @@ export async function POST(request: NextRequest) {
     }
 
     /* ── 4. Log the event for audit trail ── */
-    await logWebhookEvent(event, body as Record<string, unknown>, 'processed');
+    await logWebhookEvent(event, body as Record<string, unknown>, "processed");
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('[Skool Webhook] Unhandled error:', error);
+    captureError(error, { route: "/api/webhooks/skool" });
 
     /* Attempt to log the failure */
     await logWebhookEvent(
-      'unknown',
+      "unknown",
       { error: String(error) },
-      'failed',
-      String(error)
+      "failed",
+      String(error),
     );
 
     return NextResponse.json(
-      { error: 'Webhook processing failed.' },
-      { status: 500 }
+      { error: "Webhook processing failed." },
+      { status: 500 },
     );
   }
 }

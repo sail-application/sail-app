@@ -5,8 +5,9 @@
  * Returns full methodology data including AI coaching content.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { captureError } from "@/lib/sentry";
 
 export async function GET(
   _request: NextRequest,
@@ -14,47 +15,56 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { slug } = await params;
 
     // Fetch the methodology — try slug first, then UUID
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        slug,
+      );
     let query = supabase
-      .from('methodologies')
-      .select('*')
-      .eq('is_active', true);
+      .from("methodologies")
+      .select("*")
+      .eq("is_active", true);
 
     if (isUuid) {
-      query = query.eq('id', slug);
+      query = query.eq("id", slug);
     } else {
-      query = query.eq('slug', slug);
+      query = query.eq("slug", slug);
     }
 
     const { data: methodology, error } = await query.single();
 
     if (error || !methodology) {
-      return NextResponse.json({ error: 'Methodology not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Methodology not found" },
+        { status: 404 },
+      );
     }
 
     // Fetch child strategies/techniques
     const { data: strategies } = await supabase
-      .from('strategies')
-      .select('*')
-      .eq('methodology_id', methodology.id)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
+      .from("strategies")
+      .select("*")
+      .eq("methodology_id", methodology.id)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
 
     // Fetch user's preference for this methodology
     const { data: preference } = await supabase
-      .from('user_methodology_preferences')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('methodology_id', methodology.id)
+      .from("user_methodology_preferences")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("methodology_id", methodology.id)
       .single();
 
     return NextResponse.json({
@@ -63,7 +73,10 @@ export async function GET(
       preference: preference ?? null,
     });
   } catch (error) {
-    console.error('[API] /api/methodologies/[slug] error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    captureError(error, { route: "/api/methodologies/[slug]" });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

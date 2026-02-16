@@ -14,13 +14,18 @@
  *   - GOOGLE_GENERATIVE_AI_API_KEY (or whichever provider is configured)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod/v4';
-import { createClient } from '@/lib/supabase/server';
-import { rateLimit } from '@/lib/utils/rate-limit';
-import { aiChat } from '@/lib/ai/provider';
-import { resolveMethodology } from '@/lib/ai/methodology-resolver';
-import { composeSystemPrompt } from '@/lib/ai/prompt-composer';
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod/v4";
+import { createClient } from "@/lib/supabase/server";
+import { rateLimit } from "@/lib/utils/rate-limit";
+import { aiChat } from "@/lib/ai/provider";
+import { resolveMethodology } from "@/lib/ai/methodology-resolver";
+import { composeSystemPrompt } from "@/lib/ai/prompt-composer";
+import {
+  captureError,
+  trackRateLimitHit,
+  trackCallAnalyzed,
+} from "@/lib/sentry";
 
 /** Rate limiter scoped to this route: 10 requests per 60-second window */
 const limiter = rateLimit({ limit: 10, windowMs: 60_000 });
@@ -28,7 +33,7 @@ const limiter = rateLimit({ limit: 10, windowMs: 60_000 });
 /** Zod schema validating the incoming request body */
 const analyzeRequestSchema = z.object({
   /** The full call transcript to analyze */
-  transcript: z.string().min(10, 'Transcript must be at least 10 characters.'),
+  transcript: z.string().min(10, "Transcript must be at least 10 characters."),
   /** Optional call type for more targeted analysis (e.g. 'cold-call', 'follow-up') */
   callType: z.string().optional(),
   /** Optional methodology override (uses user's primary if not provided) */
@@ -50,20 +55,21 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized. Please sign in.' },
-        { status: 401 }
+        { error: "Unauthorized. Please sign in." },
+        { status: 401 },
       );
     }
 
     /* ── 2. Rate limit by user ID ── */
     const rateLimitResult = limiter(user.id);
     if (!rateLimitResult.success) {
+      trackRateLimitHit("/api/ai/analyze");
       return NextResponse.json(
         {
-          error: 'Too many requests. Please wait before trying again.',
+          error: "Too many requests. Please wait before trying again.",
           retryAfter: Math.ceil((rateLimitResult.reset - Date.now()) / 1000),
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -73,8 +79,8 @@ export async function POST(request: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Invalid request body.', details: parsed.error.issues },
-        { status: 400 }
+        { error: "Invalid request body.", details: parsed.error.issues },
+        { status: 400 },
       );
     }
 
@@ -83,7 +89,7 @@ export async function POST(request: NextRequest) {
     const methodology = await resolveMethodology(user.id, methodologyId);
 
     /* ── 5. Compose methodology-aware system prompt ── */
-    const systemMessages = composeSystemPrompt('analyzer', methodology);
+    const systemMessages = composeSystemPrompt("analyzer", methodology);
 
     /* ── 6. Build the user message with transcript and optional call type ── */
     const userMessage = callType
@@ -93,30 +99,30 @@ export async function POST(request: NextRequest) {
     /* ── 7. Call the AI provider with composed prompt ── */
     const response = await aiChat(
       {
-        messages: [
-          ...systemMessages,
-          { role: 'user', content: userMessage },
-        ],
-        feature: 'analyzer',
+        messages: [...systemMessages, { role: "user", content: userMessage }],
+        feature: "analyzer",
         methodologyId: methodology?.id,
       },
-      user.id
+      user.id,
     );
 
-    /* ── 8. Return the analysis result ── */
+    /* ── 8. Track feature adoption and return the analysis result ── */
+    trackCallAnalyzed();
     return NextResponse.json({
       analysis: response.content,
-      methodology: methodology ? { id: methodology.id, name: methodology.name } : null,
+      methodology: methodology
+        ? { id: methodology.id, name: methodology.name }
+        : null,
       tokensUsed: response.tokensUsed,
       provider: response.provider,
       model: response.model,
       latencyMs: response.latencyMs,
     });
   } catch (error) {
-    console.error('[API] /api/ai/analyze error:', error);
+    captureError(error, { route: "/api/ai/analyze" });
     return NextResponse.json(
-      { error: 'Internal server error. Please try again later.' },
-      { status: 500 }
+      { error: "Internal server error. Please try again later." },
+      { status: 500 },
     );
   }
 }

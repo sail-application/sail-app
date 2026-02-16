@@ -19,13 +19,14 @@
  *   - GOOGLE_GENERATIVE_AI_API_KEY (or whichever provider is configured)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod/v4';
-import { createClient } from '@/lib/supabase/server';
-import { rateLimit } from '@/lib/utils/rate-limit';
-import { aiChat } from '@/lib/ai/provider';
-import { resolveMethodology } from '@/lib/ai/methodology-resolver';
-import { composeSystemPrompt } from '@/lib/ai/prompt-composer';
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod/v4";
+import { createClient } from "@/lib/supabase/server";
+import { rateLimit } from "@/lib/utils/rate-limit";
+import { aiChat } from "@/lib/ai/provider";
+import { resolveMethodology } from "@/lib/ai/methodology-resolver";
+import { composeSystemPrompt } from "@/lib/ai/prompt-composer";
+import { captureError, trackRateLimitHit } from "@/lib/sentry";
 
 /** Rate limiter scoped to this route: 30 requests per 60-second window */
 const limiter = rateLimit({ limit: 30, windowMs: 60_000 });
@@ -36,13 +37,13 @@ const chatRequestSchema = z.object({
   messages: z
     .array(
       z.object({
-        role: z.enum(['user', 'assistant', 'system']),
+        role: z.enum(["user", "assistant", "system"]),
         content: z.string().min(1),
-      })
+      }),
     )
     .min(1),
   /** Which SAIL feature is making this request (determines AI provider/model) */
-  feature: z.enum(['live-call', 'practice', 'email', 'analyzer', 'strategies']),
+  feature: z.enum(["live-call", "practice", "email", "analyzer", "strategies"]),
   /** Optional methodology override (uses user's primary if not provided) */
   methodologyId: z.string().uuid().optional(),
 });
@@ -63,20 +64,21 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized. Please sign in.' },
-        { status: 401 }
+        { error: "Unauthorized. Please sign in." },
+        { status: 401 },
       );
     }
 
     /* ── 2. Rate limit by user ID ── */
     const rateLimitResult = limiter(user.id);
     if (!rateLimitResult.success) {
+      trackRateLimitHit("/api/ai/chat");
       return NextResponse.json(
         {
-          error: 'Too many requests. Please wait before trying again.',
+          error: "Too many requests. Please wait before trying again.",
           retryAfter: Math.ceil((rateLimitResult.reset - Date.now()) / 1000),
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -86,14 +88,14 @@ export async function POST(request: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Invalid request body.', details: parsed.error.issues },
-        { status: 400 }
+        { error: "Invalid request body.", details: parsed.error.issues },
+        { status: 400 },
       );
     }
 
     /* ── 4. Resolve methodology and inject system prompt if needed ── */
     const { messages, feature, methodologyId } = parsed.data;
-    const hasSystemMessage = messages.some((m) => m.role === 'system');
+    const hasSystemMessage = messages.some((m) => m.role === "system");
 
     let finalMessages = [...messages];
 
@@ -118,10 +120,10 @@ export async function POST(request: NextRequest) {
       latencyMs: response.latencyMs,
     });
   } catch (error) {
-    console.error('[API] /api/ai/chat error:', error);
+    captureError(error, { route: "/api/ai/chat" });
     return NextResponse.json(
-      { error: 'Internal server error. Please try again later.' },
-      { status: 500 }
+      { error: "Internal server error. Please try again later." },
+      { status: 500 },
     );
   }
 }

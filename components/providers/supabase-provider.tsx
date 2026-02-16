@@ -12,11 +12,12 @@
  * Usage: Wrap your app with <SupabaseProvider> and consume with useSupabase().
  */
 
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { setSentryUser } from "@/lib/sentry/set-user";
 
 /* ── Context Type ── */
 
@@ -32,7 +33,9 @@ type SupabaseContextValue = {
 
 /* ── Context ── */
 
-const SupabaseContext = createContext<SupabaseContextValue | undefined>(undefined);
+const SupabaseContext = createContext<SupabaseContextValue | undefined>(
+  undefined,
+);
 
 /* ── Provider Component ── */
 
@@ -55,8 +58,16 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
       setIsLoading(false);
+
+      // Sync Sentry user context so errors are tied to the right user
+      if (currentUser) {
+        setSentryUser({ id: currentUser.id, email: currentUser.email });
+      } else {
+        setSentryUser(null);
+      }
     });
 
     // Clean up the subscription when the provider unmounts
@@ -81,8 +92,8 @@ export function useSupabase(): SupabaseContextValue {
 
   if (!context) {
     throw new Error(
-      'useSupabase must be used within a <SupabaseProvider>. ' +
-        'Wrap your component tree with <SupabaseProvider> in the root layout.',
+      "useSupabase must be used within a <SupabaseProvider>. " +
+        "Wrap your component tree with <SupabaseProvider> in the root layout.",
     );
   }
 

@@ -14,13 +14,19 @@ import type {
   AiProvider,
   AiCompletionRequest,
   AiCompletionResponse,
-} from '@/types/ai';
-import type { AiProviderInterface } from '@/types/ai';
-import { GeminiProvider } from './gemini';
-import { OpenAiProvider } from './openai';
-import { AnthropicProvider } from './anthropic';
-import { DeepSeekProvider } from './deepseek';
-import { trackUsage } from './usage-tracker';
+} from "@/types/ai";
+import type { AiProviderInterface } from "@/types/ai";
+import { GeminiProvider } from "./gemini";
+import { OpenAiProvider } from "./openai";
+import { AnthropicProvider } from "./anthropic";
+import { DeepSeekProvider } from "./deepseek";
+import { trackUsage } from "./usage-tracker";
+import {
+  withAiSpan,
+  addAiBreadcrumb,
+  trackAiTokens,
+  captureError,
+} from "@/lib/sentry";
 
 /* ───────────────── Config Cache ───────────────── */
 
@@ -40,9 +46,9 @@ const configCache = new Map<AiFeature, CachedConfig>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 /** Default fallback when no config is found in the database. */
-const DEFAULT_CONFIG: Omit<CachedConfig, 'cachedAt'> = {
-  provider: 'gemini',
-  model: 'gemini-2.0-flash',
+const DEFAULT_CONFIG: Omit<CachedConfig, "cachedAt"> = {
+  provider: "gemini",
+  model: "gemini-2.0-flash",
   maxTokens: 2048,
   temperature: 0.7,
 };
@@ -66,16 +72,16 @@ function getProviderInstance(provider: AiProvider): AiProviderInterface {
 
   let instance: AiProviderInterface;
   switch (provider) {
-    case 'gemini':
+    case "gemini":
       instance = new GeminiProvider();
       break;
-    case 'openai':
+    case "openai":
       instance = new OpenAiProvider();
       break;
-    case 'claude':
+    case "claude":
       instance = new AnthropicProvider();
       break;
-    case 'deepseek':
+    case "deepseek":
       instance = new DeepSeekProvider();
       break;
     default:
@@ -107,14 +113,14 @@ async function getConfigForFeature(feature: AiFeature): Promise<CachedConfig> {
   try {
     // Dynamic import to avoid circular dependencies and keep this module
     // loadable in edge contexts where top-level DB calls would fail.
-    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { createAdminClient } = await import("@/lib/supabase/admin");
     const supabase = createAdminClient();
 
     const { data, error } = await supabase
-      .from('ai_provider_configs')
-      .select('provider, model, max_tokens, temperature')
-      .eq('feature', feature)
-      .eq('is_active', true)
+      .from("ai_provider_configs")
+      .select("provider, model, max_tokens, temperature")
+      .eq("feature", feature)
+      .eq("is_active", true)
       .single();
 
     if (error || !data) {
@@ -137,7 +143,7 @@ async function getConfigForFeature(feature: AiFeature): Promise<CachedConfig> {
     configCache.set(feature, config);
     return config;
   } catch (err) {
-    console.error('[AI] Failed to fetch provider config:', err);
+    captureError(err, { feature, route: "lib/ai/provider.ts" });
     const fallback: CachedConfig = { ...DEFAULT_CONFIG, cachedAt: now };
     configCache.set(feature, fallback);
     return fallback;
@@ -165,8 +171,27 @@ export async function aiChat(
     temperature: request.temperature ?? config.temperature,
   };
 
-  // Execute the chat call via the provider
-  const response = await provider.chat(finalRequest);
+  // Add breadcrumb for debugging timeline
+  addAiBreadcrumb(`AI chat: ${request.feature}`, {
+    provider: config.provider,
+    model: config.model,
+  });
+
+  // Execute the chat call wrapped in a Sentry span for latency tracking
+  const response = await withAiSpan(
+    request.feature,
+    config.provider,
+    config.model,
+    () => provider.chat(finalRequest),
+  );
+
+  // Track token usage as a Sentry metric
+  trackAiTokens(
+    request.feature,
+    config.provider,
+    config.model,
+    response.tokensUsed.total,
+  );
 
   // Fire-and-forget usage tracking (don't block the response)
   if (userId) {

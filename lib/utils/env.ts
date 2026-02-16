@@ -12,7 +12,7 @@
  * steps) don't fail at import time.
  */
 
-import { z } from 'zod/v4';
+import { z } from "zod/v4";
 
 /* ── Server-side env schema ── */
 
@@ -38,10 +38,13 @@ const serverEnvSchema = z.object({
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
 
+  /* Sentry */
+  SENTRY_DSN: z.url().optional(),
+
   /* App */
   NODE_ENV: z
-    .enum(['development', 'production', 'test'])
-    .default('development'),
+    .enum(["development", "production", "test"])
+    .default("development"),
 });
 
 /* ── Client-side env schema ── */
@@ -53,6 +56,7 @@ const clientEnvSchema = z.object({
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().min(1).optional(),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().min(1).optional(),
   NEXT_PUBLIC_GA_MEASUREMENT_ID: z.string().min(1).optional(),
+  NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
 });
 
 /* ── Inferred types ── */
@@ -83,5 +87,6 @@ export function validateClientEnv(): ClientEnv {
       process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_GA_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
+    NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
   });
 }
