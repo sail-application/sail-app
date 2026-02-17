@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { updatePreferenceSchema } from "@/lib/utils/methodology-validators";
 import { captureError } from "@/lib/sentry";
 
@@ -23,7 +24,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data, error } = await supabase
+    // Use admin client to bypass RLS (auth.uid() is unreliable in server context)
+    const adminSupabase = createAdminClient();
+    const { data, error } = await adminSupabase
       .from("user_methodology_preferences")
       .select("*")
       .eq("user_id", user.id);
@@ -70,9 +73,13 @@ export async function PUT(request: NextRequest) {
 
     const { methodology_id, is_enabled, is_primary, sort_order } = parsed.data;
 
+    // Use admin client to bypass RLS (auth.uid() is unreliable in Next.js server context).
+    // User identity is already validated above — we enforce user_id: user.id on every write.
+    const adminSupabase = createAdminClient();
+
     // If setting as primary, first unset any existing primary
     if (is_primary) {
-      await supabase
+      await adminSupabase
         .from("user_methodology_preferences")
         .update({ is_primary: false })
         .eq("user_id", user.id)
@@ -92,7 +99,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Upsert the preference
-    const { data, error } = await supabase
+    const { data, error } = await adminSupabase
       .from("user_methodology_preferences")
       .upsert(upsertPayload, { onConflict: "user_id,methodology_id" })
       .select()
