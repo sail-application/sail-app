@@ -1,128 +1,102 @@
 /**
  * app/api/ai/analyze/route.ts
  *
- * Post-call analysis endpoint. Accepts a call transcript (and optional call
- * type / methodology override) and uses the AI provider (feature = 'analyzer')
- * to produce a structured scorecard based on the user's active methodology.
+ * Post-call analysis endpoint. Accepts a call transcript and returns a
+ * structured JSON scorecard using multi-methodology prompting.
  *
- * Auth: Required (Supabase session via cookies)
- * Rate limit: 10 requests / 60 seconds per user (analysis is expensive)
- *
- * Required env vars:
- *   - NEXT_PUBLIC_SUPABASE_URL
- *   - NEXT_PUBLIC_SUPABASE_ANON_KEY
- *   - GOOGLE_GENERATIVE_AI_API_KEY (or whichever provider is configured)
+ * Auth: Required
+ * Rate limit: 10 / 60s (analysis is expensive)
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod/v4";
-import { createClient } from "@/lib/supabase/server";
-import { rateLimit } from "@/lib/utils/rate-limit";
-import { aiChat } from "@/lib/ai/provider";
-import { resolveMethodology } from "@/lib/ai/methodology-resolver";
-import { composeSystemPrompt } from "@/lib/ai/prompt-composer";
-import {
-  captureError,
-  trackRateLimitHit,
-  trackCallAnalyzed,
-} from "@/lib/sentry";
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod/v4';
+import { createClient } from '@/lib/supabase/server';
+import { rateLimit } from '@/lib/utils/rate-limit';
+import { aiChat } from '@/lib/ai/provider';
+import { resolveMethodologies } from '@/lib/ai/methodology-resolver';
+import { composeMultiMethodologyPrompt } from '@/lib/ai/prompt-composer';
+import { resolveProficiencyLevel } from '@/lib/ai/proficiency-resolver';
+import { loadContextPack } from '@/lib/ai/context-pack-loader';
+import { captureError, trackRateLimitHit, trackCallAnalyzed } from '@/lib/sentry';
 
-/** Rate limiter scoped to this route: 10 requests per 60-second window */
 const limiter = rateLimit({ limit: 10, windowMs: 60_000 });
 
-/** Zod schema validating the incoming request body */
 const analyzeRequestSchema = z.object({
-  /** The full call transcript to analyze */
-  transcript: z.string().min(10, "Transcript must be at least 10 characters."),
-  /** Optional call type for more targeted analysis (e.g. 'cold-call', 'follow-up') */
+  transcript: z.string().min(10, 'Transcript must be at least 10 characters.'),
   callType: z.string().optional(),
-  /** Optional methodology override (uses user's primary if not provided) */
-  methodologyId: z.string().uuid().optional(),
+  methodologyIds: z.array(z.string().uuid()).max(5).optional(),
+  contextPackId: z.string().uuid().optional(),
 });
 
 /**
  * POST /api/ai/analyze
- * Accepts a call transcript and returns a structured analysis scorecard.
+ * Returns a structured JSON scorecard: { overall_score, dimensions, strengths, weaknesses, action_items }
  */
 export async function POST(request: NextRequest) {
   try {
-    /* ── 1. Authenticate the user ── */
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized. Please sign in." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
     }
 
-    /* ── 2. Rate limit by user ID ── */
     const rateLimitResult = limiter(user.id);
     if (!rateLimitResult.success) {
-      trackRateLimitHit("/api/ai/analyze");
+      trackRateLimitHit('/api/ai/analyze');
       return NextResponse.json(
-        {
-          error: "Too many requests. Please wait before trying again.",
-          retryAfter: Math.ceil((rateLimitResult.reset - Date.now()) / 1000),
-        },
+        { error: 'Too many requests.', retryAfter: Math.ceil((rateLimitResult.reset - Date.now()) / 1000) },
         { status: 429 },
       );
     }
 
-    /* ── 3. Parse and validate the request body ── */
     const body = await request.json();
     const parsed = analyzeRequestSchema.safeParse(body);
-
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request body.", details: parsed.error.issues },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Invalid request body.', details: parsed.error.issues }, { status: 400 });
     }
 
-    /* ── 4. Resolve the user's active methodology ── */
-    const { transcript, callType, methodologyId } = parsed.data;
-    const methodology = await resolveMethodology(user.id, methodologyId);
+    const { transcript, callType, methodologyIds, contextPackId } = parsed.data;
 
-    /* ── 5. Compose methodology-aware system prompt ── */
-    const systemMessages = composeSystemPrompt("analyzer", methodology);
+    // Resolve methodologies, proficiency, and context pack in parallel
+    const [methodologies, proficiencyLevel, contextPack] = await Promise.all([
+      resolveMethodologies(user.id, methodologyIds),
+      resolveProficiencyLevel(user.id, methodologyIds ?? []),
+      loadContextPack(contextPackId),
+    ]);
 
-    /* ── 6. Build the user message with transcript and optional call type ── */
-    const userMessage = callType
-      ? `Call type: ${callType}\n\nTranscript:\n${transcript}`
-      : `Transcript:\n${transcript}`;
+    const systemMessages = composeMultiMethodologyPrompt('analyzer', methodologies, proficiencyLevel, contextPack);
 
-    /* ── 7. Call the AI provider with composed prompt ── */
+    // Request structured JSON output for easy frontend rendering
+    const userMessage = (callType ? `Call type: ${callType}\n\n` : '') +
+      `Transcript:\n${transcript}\n\n` +
+      `Respond with ONLY a JSON object (no markdown):\n` +
+      `{"overall_score":0-100,"dimensions":{"rapport":0-10,"discovery":0-10,"objection_handling":0-10,"close":0-10},"strengths":["..."],"weaknesses":["..."],"action_items":["..."]}`;
+
     const response = await aiChat(
-      {
-        messages: [...systemMessages, { role: "user", content: userMessage }],
-        feature: "analyzer",
-        methodologyId: methodology?.id,
-      },
+      { messages: [...systemMessages, { role: 'user', content: userMessage }], feature: 'analyzer' },
       user.id,
     );
 
-    /* ── 8. Track feature adoption and return the analysis result ── */
+    // Parse the JSON response (strip fences if present)
+    let scorecard: Record<string, unknown> = {};
+    try {
+      const stripped = response.content.replace(/^```json\s*|\s*```$/gm, '').trim();
+      scorecard = JSON.parse(stripped);
+    } catch {
+      // Return raw content if JSON parsing fails
+      scorecard = { raw: response.content };
+    }
+
     trackCallAnalyzed();
     return NextResponse.json({
-      analysis: response.content,
-      methodology: methodology
-        ? { id: methodology.id, name: methodology.name }
-        : null,
+      scorecard,
+      methodologies: methodologies.map((m) => ({ id: m.id, name: m.name })),
       tokensUsed: response.tokensUsed,
       provider: response.provider,
       model: response.model,
-      latencyMs: response.latencyMs,
     });
   } catch (error) {
-    captureError(error, { route: "/api/ai/analyze" });
-    return NextResponse.json(
-      { error: "Internal server error. Please try again later." },
-      { status: 500 },
-    );
+    captureError(error, { route: '/api/ai/analyze' });
+    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
   }
 }

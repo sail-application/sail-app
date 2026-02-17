@@ -1,31 +1,57 @@
 /**
- * app/(dashboard)/email/page.tsx — Email Composition placeholder.
+ * app/(dashboard)/email/page.tsx — Email Composition page.
  *
- * Server Component placeholder for the Email Composition feature.
- * Displays the feature name, icon, and "Coming soon" message.
- * Will be replaced with AI-assisted prospect outreach drafting
- * using Gemini Pro for high-quality email generation.
+ * Server Component that fetches methodologies and context packs,
+ * then renders the EmailComposer client component.
  */
 
 import type { Metadata } from 'next';
-import { Mail } from 'lucide-react';
-import { GlassPanel } from '@/components/ui/glass-panel';
+import { createClient } from '@/lib/supabase/server';
+import { EmailComposer } from '@/components/features/email/email-composer';
+import type { MethodologyListItem } from '@/types/methodology';
+import type { ContextPackOption } from '@/components/features/shared/context-pack-selector';
 
 export const metadata: Metadata = {
   title: 'Email Composition',
 };
 
-/** EmailPage — Placeholder for the AI-assisted email drafting feature. */
-export default function EmailPage() {
-  return (
-    <GlassPanel className="flex flex-col items-center justify-center p-12 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600/15 text-brand-600 mb-4">
-        <Mail className="h-7 w-7" />
-      </div>
-      <h2 className="text-2xl font-bold tracking-tight mb-2">Email Composition</h2>
-      <p className="text-foreground/60 max-w-md">
-        AI-assisted prospect outreach drafting for effective sales emails. Coming soon.
-      </p>
-    </GlassPanel>
-  );
+export default async function EmailPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  let methodologies: MethodologyListItem[] = [];
+  let contextPacks: ContextPackOption[] = [];
+
+  if (user) {
+    const [methodologiesResult, contextPacksResult] = await Promise.all([
+      supabase
+        .from('user_methodology_preferences')
+        .select(`
+          methodology_id,
+          sort_order,
+          methodologies (
+            id, name, slug, author, tagline,
+            icon, category, relevance_rating, complexity_level,
+            tags, access_tier, sort_order, is_active,
+            trademark_attribution
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('is_enabled', true)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('context_packs')
+        .select('id, name, slug, description, icon')
+        .eq('is_active', true)
+        .order('name'),
+    ]);
+
+    methodologies = (methodologiesResult.data ?? [])
+      .map((row) => row.methodologies as unknown as MethodologyListItem)
+      .filter((m): m is MethodologyListItem => m !== null && m.is_active);
+
+    contextPacks = (contextPacksResult.data ?? []) as ContextPackOption[];
+  }
+
+  return <EmailComposer methodologies={methodologies} contextPacks={contextPacks} />;
 }
