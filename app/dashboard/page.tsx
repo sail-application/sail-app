@@ -40,7 +40,7 @@ export const metadata: Metadata = {
 const features = [
   {
     title: 'Live Call Assistant',
-    description: 'Real-time coaching during active sales calls with sub-2s latency.',
+    description: 'Real-time coaching during active conversations with sub-2s latency.',
     href: '/dashboard/live-call',
     icon: Phone,
   },
@@ -64,7 +64,7 @@ const features = [
   },
   {
     title: 'Strategies Library',
-    description: 'Searchable Paul Cherry methodology techniques and scripts.',
+    description: 'Browse and manage your active coaching strategies and techniques.',
     href: '/dashboard/strategies',
     icon: BookOpen,
   },
@@ -97,7 +97,7 @@ export default async function DashboardPage() {
           Welcome back, {firstName}
         </h2>
         <p className="mt-1 text-foreground/60">
-          Choose a feature below to start training.
+          Choose a feature below to get started.
         </p>
       </div>
 
