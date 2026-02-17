@@ -1,13 +1,13 @@
 # SAIL — Sales AI Learning Platform
 
 ## What
-Next.js 15 (App Router) web app for training volume photographers in sales. Built on Vercel + Supabase. Trains users using Paul Cherry's "Questions That Sell" methodology (Sure → Want To → Have To).
+Next.js 15 (App Router) universal conversation coaching platform. Built on Vercel + Supabase. Helps professionals improve communication skills across any industry — from B2B sales to negotiations to parenting. Strategies/methodologies are modular and can be toggled on/off per session.
 
 ## Business Context
 - **Company:** SA Picture Day — volume photography business in San Antonio, TX
 - **Owner:** Alex — experienced IT leader, not a developer. All code must be written with that in mind.
-- **Target market:** Dance studios (highest priority — 90+ researched in SA area), schools, daycares, sports organizations
-- **Prospect profile:** Businesses with active online presence, hosting events/recitals/picture days/group activities, San Antonio metro area (unless told otherwise)
+- **Target market:** Sales professionals, negotiators, managers, educators — anyone who needs structured conversation coaching. Current focus: SA Picture Day volume photography team (original use case), plus any business professional wanting to sharpen communication.
+- **Prospect profile (for SA Picture Day):** Businesses with active online presence, hosting events/recitals/picture days/group activities, San Antonio metro area (unless told otherwise)
 - **Community:** SA Picture Day Skool group — SAIL is gated to Skool members only
 
 ## Stack
@@ -69,11 +69,11 @@ Next.js 15 (App Router) web app for training volume photographers in sales. Buil
 - **Containers:** Docker for local full-stack dev + CI verification (NOT for production — Vercel handles that)
 
 ## Core Features (6)
-1. **Live Call Assistant** — Real-time coaching during active calls. Sub-2s latency. Gemini Flash.
-2. **Practice Mode** — AI roleplay with click-to-talk, split-screen coach tips, 10-level progress.
-3. **Email Composition** — AI-assisted prospect outreach drafting. Gemini Pro.
+1. **Live Call Assistant** — Real-time coaching during active conversations. Sub-2s latency. Gemini Flash.
+2. **Practice Mode** — AI roleplay with coaching tips, scenario selection, multi-methodology support.
+3. **Email Composition** — AI-assisted outreach drafting for any industry. Gemini Pro.
 4. **Call Analyzer** — Post-call upload, scorecards, improvement suggestions. Gemini Pro.
-5. **Strategies Library** — Searchable Paul Cherry methodology techniques.
+5. **Strategies Library** — Browse and manage active coaching methodologies (BANT, MEDPIC, Paul Cherry, etc.).
 6. **Dashboard** — Unified progress, activity, metrics overview.
 
 ## AI Architecture
@@ -151,6 +151,159 @@ Every tool must support a dry run flag that simulates the full workflow without 
 6. **Docker verify** — Run `make verify` (Docker clean-build) before marking features complete
 7. **Proactively refactor** — Suggest refactoring when code smells or better alternatives exist
 8. **Pivot when needed** — Recommend simpler alternatives if current approach has friction
+
+## Agent Creation Strategy
+
+### When to Suggest Building Agents
+Proactively recommend building specialized agents when encountering:
+
+**Large Tasks (>4 hours or >3 files affected):**
+- Building new major features (billing system, CRM integrations, multi-step workflows)
+- Complex migrations (database schema changes, data transformations)
+- Cross-cutting changes (adding security layer, analytics tracking across features)
+
+**Repetitive Tasks (will be done 3+ times):**
+- Database migrations and schema changes
+- Creating new feature pages following SAIL patterns
+- Testing workflows before each deploy
+- Methodology content creation (JSONB structures)
+- Integration debugging (external APIs)
+- Performance audits and optimization
+
+**Domain-Specific Work:**
+- AI prompt engineering and testing across methodologies
+- Sales content generation (emails, practice scenarios)
+- CRM data operations (enrichment, deduplication, sync)
+
+### Agent Proposal Workflow
+
+**MANDATORY: Always get approval before building agents**
+
+When identifying an agent opportunity:
+
+1. **Stop and Propose** — Don't start the task yet
+2. **Present Agent Specification:**
+   ```
+   🤖 Agent Recommendation: [Name]
+
+   Purpose: [What problem does it solve]
+
+   Capabilities:
+   - [Specific task 1]
+   - [Specific task 2]
+   - [Specific task 3]
+
+   Time Savings: [X hours per use]
+
+   Will be used for:
+   - [Immediate use case]
+   - [Future use case 1]
+   - [Future use case 2]
+
+   Build time: [Estimated hours]
+
+   Alternative: [What we'd do manually without the agent]
+   ```
+
+3. **Wait for User Decision:**
+   - ✅ "Build it" → Proceed with agent creation
+   - ❌ "Skip it, do manually" → Execute task without agent
+   - 🤔 "Tell me more" → Provide additional details
+
+4. **Never Assume Approval** — Even if task is perfect for an agent, always ask first
+
+### SAIL-Specific Agent Types
+
+**High-Value Agents for This Project:**
+
+1. **Supabase Migration Agent**
+   - Creates timestamped migration files
+   - Generates RLS policies automatically
+   - Writes indexes and constraints
+   - Updates TypeScript types
+   - Validates syntax before push
+   - *Use frequency: Multiple times per week*
+
+2. **Feature Builder Agent**
+   - Scaffolds new dashboard pages
+   - Creates API routes with Zod validation
+   - Adds to navigation and routing
+   - Implements glassmorphism design
+   - Sets up AI provider configs
+   - Adds usage tracking hooks
+   - *Use frequency: Each new feature*
+
+3. **Methodology Builder Agent**
+   - Interviews user about sales methodology
+   - Generates JSONB structures (scoring_rubric, stages, vocabulary, etc.)
+   - Creates migration seed file
+   - Validates against schema
+   - Generates test scenarios
+   - *Use frequency: Each new methodology (3-10 per quarter)*
+
+4. **AI Prompt Testing Agent**
+   - Tests prompts across all methodologies
+   - Validates 5-layer system prompt composition
+   - Runs A/B tests on variations
+   - Measures quality, latency, cost
+   - Tests with different user personas
+   - *Use frequency: Each prompt change, feature addition*
+
+5. **End-to-End Tester Agent**
+   - Runs critical user flows (auth, features, billing)
+   - Tests across browsers and devices
+   - Validates API responses and RLS policies
+   - Generates test reports with screenshots
+   - *Use frequency: Before every production deploy*
+
+6. **Integration Debugger Agent**
+   - Tests external API endpoints (Stripe, Zoho, Deepgram, Gemini)
+   - Validates webhook signatures
+   - Reproduces integration errors
+   - Monitors integration health
+   - *Use frequency: When integrations fail or during new integration setup*
+
+7. **Performance Auditor Agent**
+   - Runs Lighthouse audits
+   - Analyzes database query performance
+   - Measures API response times
+   - Calculates COGS per feature
+   - Identifies expensive AI calls
+   - *Use frequency: Monthly or when users report slowness*
+
+### Agent Approval Example
+
+❌ **Bad (No Approval):**
+```
+User: "Add billing tables to the database"
+AI: [Immediately starts building migration agent without asking]
+```
+
+✅ **Good (With Approval):**
+```
+User: "Add billing tables to the database"
+
+AI: "I can create these tables manually, or we could build a Supabase
+     Migration Agent that would handle this and all future schema changes.
+
+     The agent would:
+     - Generate migration files with proper RLS policies
+     - Create indexes automatically
+     - Update TypeScript types
+     - Validate syntax before pushing
+
+     Build time: ~30 minutes
+     Time saved per use: ~30-60 minutes
+
+     You'll need this agent for billing tables now, and for every schema
+     change going forward (dozens of times).
+
+     Should I build the agent first, or handle this migration manually?"
+
+User: "Build the agent"
+
+AI: [Proceeds with agent creation, then uses it for the billing tables]
+```
 
 ## File Size Rule
 - **No file > 200 lines.** Split into smaller modules proactively.

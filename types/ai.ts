@@ -41,6 +41,10 @@ export interface AiCompletionRequest {
   stream?: boolean;
   /** Active methodology ID — used by prompt composer to inject methodology context */
   methodologyId?: string;
+  /** Multiple methodology IDs for multi-methodology session support */
+  methodologyIds?: string[];
+  /** Context pack ID — injects industry/domain overlay into the system prompt */
+  contextPackId?: string;
 }
 
 /**

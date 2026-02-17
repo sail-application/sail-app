@@ -147,6 +147,34 @@ async function loadMethodologyById(id: string): Promise<Methodology | null> {
   }
 }
 
+/**
+ * Resolves multiple methodologies by their IDs.
+ * Used for multi-methodology session support (e.g., BANT + MEDPIC together).
+ * Falls back to the user's enabled methodologies when no IDs are provided.
+ *
+ * @param userId - The authenticated user's ID (for fallback resolution)
+ * @param methodologyIds - Explicit list of methodology IDs to load (optional)
+ * @returns Array of full methodology rows in the requested order
+ */
+export async function resolveMethodologies(
+  userId: string,
+  methodologyIds?: string[],
+): Promise<Methodology[]> {
+  // If specific IDs provided, load each one (uses per-ID cache)
+  if (methodologyIds && methodologyIds.length > 0) {
+    const results = await Promise.all(
+      methodologyIds.map((id) => loadMethodologyById(id)),
+    );
+    // Filter out nulls (inactive or missing methodologies)
+    return results.filter((m): m is Methodology => m !== null);
+  }
+
+  // Fallback: return the user's single resolved methodology as a one-item array
+  // This keeps the multi-methodology API backwards-compatible
+  const single = await resolveMethodology(userId);
+  return single ? [single] : [];
+}
+
 /** Clears the methodology cache (e.g., after admin edits). */
 export function clearMethodologyCache(): void {
   methodologyCache.clear();

@@ -63,6 +63,9 @@ infrastructure/*.tfvars
 # Docker
 docker/data/
 
+# MCP (contains auth tokens)
+.mcp.json
+
 # Sentry
 .sentryclirc
 
