@@ -92,6 +92,81 @@ export interface PracticeSession {
   created_at: string;
 }
 
+/* ────────────────────── Context Packs ───────────────────────────── */
+
+/** Row in `context_packs` — industry/domain overlay packs that enrich AI coaching context */
+export interface ContextPack {
+  id: string;
+  name: string;
+  /** URL-safe identifier, e.g. "b2b-saas-sales" */
+  slug: string;
+  description: string | null;
+  /** Appended to Layer 1 of the system prompt to inject industry identity */
+  identity_overlay: string | null;
+  /** Pre-built practice scenarios for this industry — array of scenario objects */
+  persona_templates: unknown[];
+  /** Industry-specific vocabulary merged with methodology vocab — key→value pairs */
+  vocabulary_overlay: Record<string, string>;
+  /** Methodology UUIDs that work well with this context pack */
+  suggested_methodology_ids: string[];
+  /** Emoji or icon shown in the selector UI */
+  icon: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+/* ──────────────────── Session Configurations ────────────────────── */
+
+/** Row in `session_configurations` — saved session presets (methodology + context pack) */
+export interface SessionConfiguration {
+  id: string;
+  user_id: string;
+  /** Which SAIL feature this config applies to */
+  session_type: 'practice' | 'live-call' | 'analyzer';
+  /** Array of methodology IDs selected for this configuration */
+  methodology_ids: string[];
+  /** Optional industry context pack linked to this configuration */
+  context_pack_id: string | null;
+  /** Human-readable label, e.g. "BANT + MEDPIC for SaaS" */
+  name: string | null;
+  /** Whether this is the default preset shown when opening the session type */
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/* ─────────────────── Live Call Sessions ─────────────────────────── */
+
+/** A single coaching event emitted during a live call */
+export interface CoachingEvent {
+  id: string;
+  timestamp: string;
+  type: 'tip' | 'alert';
+  content: string;
+}
+
+/** Row in `live_call_sessions` — real-time coaching session with transcript + coaching events */
+export interface LiveCallSession {
+  id: string;
+  user_id: string;
+  /** Optional link to a saved session configuration */
+  session_config_id: string | null;
+  status: 'active' | 'completed';
+  /** Full conversation transcript — array of { speaker, text, timestamp } objects */
+  transcript: unknown[];
+  /** Coaching tips/alerts emitted during the call */
+  coaching_events: CoachingEvent[];
+  /** Dynamic checklist — key → boolean, updated as topics are covered */
+  checklist_state: Record<string, boolean>;
+  /** Qualification data extracted from transcript — key → extracted value */
+  qualification_data: Record<string, unknown>;
+  duration_seconds: number | null;
+  created_at: string;
+  completed_at: string | null;
+  /** Industry context pack active during this session */
+  context_pack_id: string | null;
+}
+
 /* ────────────────────── Strategies Library ───────────────────────── */
 
 /** Row in `strategies` — methodology technique reference cards */

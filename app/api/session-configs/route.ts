@@ -36,7 +36,7 @@ const updateSchema = z.object({
   context_pack_id: z.string().uuid().optional().nullable(),
 });
 
-async function getAuthUser(request: NextRequest) {
+async function getAuthUser() {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return null;
@@ -51,7 +51,7 @@ async function getAuthUser(request: NextRequest) {
 
 /** GET — list configs for a session type */
 export async function GET(request: NextRequest) {
-  const user = await getAuthUser(request);
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   if (user === 'rate_limited') return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
 
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
 /** POST — create a new config */
 export async function POST(request: NextRequest) {
-  const user = await getAuthUser(request);
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   if (user === 'rate_limited') return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
 
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
 /** PATCH — update an existing config */
 export async function PATCH(request: NextRequest) {
-  const user = await getAuthUser(request);
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   if (user === 'rate_limited') return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
 
@@ -175,7 +175,7 @@ export async function PATCH(request: NextRequest) {
 
 /** DELETE — remove a config */
 export async function DELETE(request: NextRequest) {
-  const user = await getAuthUser(request);
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   if (user === 'rate_limited') return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
 
