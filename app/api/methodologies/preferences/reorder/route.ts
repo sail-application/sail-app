@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { userReorderSchema } from "@/lib/utils/methodology-validators";
 import { captureError } from "@/lib/sentry";
 
@@ -33,9 +34,13 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    // Use admin client to bypass RLS (auth.uid() unreliable in Next.js server context).
+    // User identity is already validated above — user_id is explicitly set on every write.
+    const adminSupabase = createAdminClient();
+
     // Upsert each preference with the new sort_order
     const updates = parsed.data.items.map((item) =>
-      supabase.from("user_methodology_preferences").upsert(
+      adminSupabase.from("user_methodology_preferences").upsert(
         {
           user_id: user.id,
           methodology_id: item.methodology_id,

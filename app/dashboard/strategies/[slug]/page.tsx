@@ -66,8 +66,10 @@ export default async function MethodologyDetailPage({ params }: PageProps) {
     isAdmin = !!data;
   }
 
-  // Fetch user's preference for this methodology (for enable/disable toggle)
-  let isEnabled = slug === 'questions-that-sell'; // Paul Cherry ON by default
+  // Fetch user's preference for this methodology (for enable/disable toggle).
+  // Default to true (enabled) when no preference row exists — consistent with
+  // the Strategies grid which also shows all methodologies as enabled by default.
+  let isEnabled = true;
   if (user) {
     const { data: pref } = await supabase
       .from('user_methodology_preferences')

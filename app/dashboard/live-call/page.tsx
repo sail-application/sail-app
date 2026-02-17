@@ -63,6 +63,20 @@ export default async function LiveCallPage() {
       .map((row) => row.methodologies as unknown as MethodologyListItem)
       .filter((m): m is MethodologyListItem => m !== null && m.is_active);
 
+    // If the user has never configured preferences, fall back to all active
+    // methodologies rather than showing "No methodologies enabled." This matches
+    // what the Strategies grid implies (all green by default for new users).
+    if (methodologies.length === 0) {
+      const { data: allMethodologies } = await supabase
+        .from('methodologies')
+        .select(
+          'id, name, slug, author, tagline, icon, category, relevance_rating, complexity_level, tags, access_tier, sort_order, is_active, trademark_attribution',
+        )
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      methodologies = (allMethodologies ?? []).filter((m) => m.is_active) as MethodologyListItem[];
+    }
+
     contextPacks = (contextPacksResult.data ?? []) as ContextPackOption[];
   }
 
