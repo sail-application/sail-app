@@ -1,12 +1,13 @@
 /**
  * lib/ai/prompt-composer.ts
  *
- * Five-layer prompt composition for methodology-aware AI coaching.
- * Replaces all hardcoded system prompts with dynamic, methodology-specific
- * prompts that work identically across all LLM providers.
+ * Public API for five-layer methodology-aware prompt composition.
+ * Build helpers (Layer 2) live in methodology-context.ts to keep this file
+ * under the 200-line limit.
  *
  * Layers:
- *   1. Base Identity    → "You are a sales coaching AI for SAIL..."
+ *   1. Base Identity    → "You are SAIL, a conversation coaching AI..."
+ *   1b. Context Pack    → industry overlay appended to base identity
  *   2. Methodology      → system_prompt_template + stages + question_types
  *   3. Feature-Specific → feature_prompt_overrides[feature] OR default
  *   4. User Context     → proficiency level adaptation
@@ -17,22 +18,26 @@
 
 import type { AiMessage, AiFeature } from '@/types/ai';
 import type { Methodology } from '@/types/methodology';
+import {
+  buildMethodologyContext,
+  buildMultiMethodologyContext,
+} from './methodology-context';
 
-/* ──────────────── Base Identity (Layer 1) ──────────────── */
+/* ──────────────── Layer 1: Base Identity ──────────────── */
 
-const BASE_IDENTITY = `You are SAIL, a sales coaching AI for volume photography businesses. You help sales representatives improve their selling skills through practice, real-time coaching, email composition, and call analysis. Your expertise is in B2B sales for services like school photography, dance studio photos, sports team photos, and daycare picture days. Always be encouraging, specific, and actionable in your coaching.`;
+const BASE_IDENTITY = `You are SAIL, a conversation coaching AI. You help professionals improve their communication skills through practice, real-time coaching, email composition, and conversation analysis. You adapt to any industry or context — from B2B sales to negotiations to personal conversations. Always be encouraging, specific, and actionable.`;
 
-/* ──────────────── Feature Defaults (Layer 3 fallback) ──────────────── */
+/* ──────────────── Layer 3: Feature Defaults (fallback) ──────────────── */
 
 const FEATURE_DEFAULTS: Record<AiFeature, string> = {
   'live-call': 'You are providing real-time coaching during an active sales call. Be extremely concise — max 1-2 sentences. Focus on the most impactful suggestion right now.',
   practice: 'You are roleplaying as a prospect in a practice sales call. Stay in character. After the session, provide detailed feedback on strengths and areas for improvement.',
   email: 'You are helping compose a professional sales outreach email. Focus on personalization, value proposition, and a clear call-to-action.',
   analyzer: 'You are analyzing a completed sales call recording. Provide a detailed scorecard with specific examples from the transcript. Be constructive and actionable.',
-  strategies: 'You are explaining a sales methodology technique. Be clear, use examples relevant to volume photography sales, and suggest how to practice.',
+  strategies: 'You are explaining a coaching methodology or technique. Be clear, use relevant examples, and suggest how to practice.',
 };
 
-/* ──────────────── Proficiency Templates (Layer 4) ──────────────── */
+/* ──────────────── Layer 4: Proficiency Templates ──────────────── */
 
 const PROFICIENCY_INSTRUCTIONS: Record<string, string> = {
   beginner: 'The user is a beginner. Provide verbatim example phrases they can use. Be very specific and prescriptive. Walk them through each step.',
@@ -43,7 +48,7 @@ const PROFICIENCY_INSTRUCTIONS: Record<string, string> = {
 /* ──────────────── Public API ──────────────── */
 
 /**
- * Composes methodology-aware system messages for an AI call.
+ * Composes methodology-aware system messages for a single-methodology AI call.
  * Returns AiMessage[] with system messages that any provider can consume.
  *
  * @param feature - Which SAIL feature is making the call
@@ -70,89 +75,63 @@ export function composeSystemPrompt(
   const featurePrompt = methodology?.feature_prompt_overrides?.[feature]
     ?? FEATURE_DEFAULTS[feature]
     ?? '';
-  if (featurePrompt) {
-    parts.push(featurePrompt);
-  }
+  if (featurePrompt) parts.push(featurePrompt);
 
   // Layer 4: Proficiency adaptation
-  const proficiencyPrompt = PROFICIENCY_INSTRUCTIONS[proficiencyLevel]
-    ?? PROFICIENCY_INSTRUCTIONS.beginner;
-  parts.push(proficiencyPrompt);
+  parts.push(PROFICIENCY_INSTRUCTIONS[proficiencyLevel] ?? PROFICIENCY_INSTRUCTIONS.beginner);
 
   return [{ role: 'system', content: parts.join('\n\n') }];
 }
 
-/* ──────────────── Internal Helpers ──────────────── */
-
 /**
- * Builds the methodology context string (Layer 2).
- * Adapts content depth based on feature latency requirements:
- *   - live-call: stages + question types only (minimal for <2s)
- *   - practice/email: full context
- *   - analyzer: full context + scoring rubric
+ * Composes a system prompt when multiple methodologies are active simultaneously.
+ * Combines all methodology contexts with clear section headers so the AI can
+ * draw on each framework appropriately.
+ *
+ * @param feature - Which SAIL feature is making the call
+ * @param methodologies - Array of resolved methodologies (empty = generic coaching)
+ * @param proficiencyLevel - User's skill level
+ * @param contextPack - Optional industry overlay injected into Layers 1b + vocabulary
+ * @returns Array of system messages to prepend to the conversation
  */
-function buildMethodologyContext(
-  methodology: Methodology,
+export function composeMultiMethodologyPrompt(
   feature: AiFeature,
-): string {
+  methodologies: Methodology[],
+  proficiencyLevel: string = 'beginner',
+  contextPack?: { identity_overlay?: string; vocabulary_overlay?: Record<string, string> } | null,
+): AiMessage[] {
   const parts: string[] = [];
 
-  // Always include the methodology's system prompt template
-  if (methodology.system_prompt_template) {
-    parts.push(methodology.system_prompt_template);
+  // Layer 1: Base identity
+  parts.push(BASE_IDENTITY);
+
+  // Layer 1b: Context pack identity overlay (e.g., "You are coaching a B2B SaaS rep...")
+  if (contextPack?.identity_overlay) {
+    parts.push(contextPack.identity_overlay);
   }
 
-  // Stages — always included (core of every methodology)
-  if (methodology.stages?.length > 0) {
-    const stageText = methodology.stages
-      .sort((a, b) => a.order - b.order)
-      .map((s) => `${s.order}. ${s.name}: ${s.description}`)
-      .join('\n');
-    parts.push(`## Methodology Stages\n${stageText}`);
+  // Layer 2: Combined methodology context (single-method path used when only one active)
+  if (methodologies.length > 0) {
+    parts.push(buildMultiMethodologyContext(methodologies, feature));
   }
 
-  // Question types — included for all features except live-call (too verbose)
-  if (feature !== 'live-call' && methodology.question_types?.length > 0) {
-    const qtText = methodology.question_types
-      .map((q) => `- **${q.name}**: ${q.purpose}`)
-      .join('\n');
-    parts.push(`## Question Types\n${qtText}`);
-  }
-
-  // Vocabulary — helps AI use correct methodology-specific terms
-  if (methodology.vocabulary && Object.keys(methodology.vocabulary).length > 0) {
-    const vocabText = Object.entries(methodology.vocabulary)
+  // Context pack vocabulary — merged after methodology vocabulary to avoid duplicates
+  if (contextPack?.vocabulary_overlay && Object.keys(contextPack.vocabulary_overlay).length > 0) {
+    const vocabText = Object.entries(contextPack.vocabulary_overlay)
       .map(([term, def]) => `- **${term}**: ${def}`)
       .join('\n');
-    parts.push(`## Key Terminology\n${vocabText}`);
+    parts.push(`## Industry Terminology\n${vocabText}`);
   }
 
-  // Anti-patterns and success signals — for practice and analyzer
-  if (feature === 'practice' || feature === 'analyzer') {
-    if (methodology.anti_patterns?.length > 0) {
-      const apText = methodology.anti_patterns
-        .map((ap) => `- **${ap.name}**: ${ap.description}`)
-        .join('\n');
-      parts.push(`## Common Mistakes to Watch For\n${apText}`);
-    }
+  // Layer 3: Feature-specific instructions (uses first methodology's overrides, or default)
+  const primaryMethodology = methodologies[0] ?? null;
+  const featurePrompt = primaryMethodology?.feature_prompt_overrides?.[feature]
+    ?? FEATURE_DEFAULTS[feature]
+    ?? '';
+  if (featurePrompt) parts.push(featurePrompt);
 
-    if (methodology.success_signals?.length > 0) {
-      const ssText = methodology.success_signals
-        .map((ss) => `- **${ss.name}**: ${ss.description}`)
-        .join('\n');
-      parts.push(`## Positive Signals to Reinforce\n${ssText}`);
-    }
-  }
+  // Layer 4: Proficiency adaptation
+  parts.push(PROFICIENCY_INSTRUCTIONS[proficiencyLevel] ?? PROFICIENCY_INSTRUCTIONS.beginner);
 
-  // Scoring rubric — only for analyzer (needs dimension details)
-  if (feature === 'analyzer' && methodology.scoring_rubric?.length > 0) {
-    const rubricText = methodology.scoring_rubric
-      .map((d) => `- **${d.name}** (weight: ${d.weight}): ${d.description}`)
-      .join('\n');
-    parts.push(
-      `## Scoring Rubric\nRate each dimension 1-10 with evidence from the transcript:\n${rubricText}`,
-    );
-  }
-
-  return parts.join('\n\n');
+  return [{ role: 'system', content: parts.join('\n\n') }];
 }
